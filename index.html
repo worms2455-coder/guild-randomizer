@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuildMaster Randomizer (Standalone)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        guild: {
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155',
+                            accent: '#8b5cf6', // Violet
+                            gold: '#f59e0b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React & ReactDOM (UMD Development for file:// compatibility) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Animations */
+        @keyframes shine {
+            0% { transform: translateX(-100%) }
+            100% { transform: translateX(100%) }
+        }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24",
+    "canvas-confetti": "https://aistudiocdn.com/canvas-confetti@^1.9.4"
+  }
+}
+</script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- DATA CONSTANTS ---
+        const STAGES = [
+            { threshold: 15, prize: "120 💎", count: 3, title: "НОВИЧОК" },
+            { threshold: 25, prize: "180 💎", count: 2, title: "ЛЮБИТЕЛЬ" },
+            { threshold: 50, prize: "400 💎", count: 1, title: "ОПЫТНЫЙ" },
+            { threshold: 75, prize: "600 💎", count: 1, title: "ГРАНД-МАСТЕР" },
+            { threshold: 100, prize: "900 💎", count: 1, title: "ЭЛИТА" },
+            { threshold: 125, prize: "2000 💎", count: 1, title: "ЛЕГЕНДА" },
+        ];
+
+        const INITIAL_MEMBERS = [
+            { id: '1', name: 'Фасоль#51817', investments: 150818174500, startScore: 0, endScore: 0, reward: '100G' },
+            { id: '2', name: 'Мяу#97418', investments: 723767374500, startScore: 0, endScore: 0, reward: '125G' },
+            { id: '3', name: 'dimandorf#98147', investments: 347739374500, startScore: 0, endScore: 0, reward: '50G' },
+            { id: '4', name: 'Nezhdanchick#90542', investments: 121985674500, startScore: 0, endScore: 0, reward: '15G' },
+            { id: '5', name: 'Дэментор#5030', investments: 375947374500, startScore: 0, endScore: 0, reward: '75G' },
+            { id: '6', name: 'Adanei#72323', investments: 60665339100, startScore: 0, endScore: 0, reward: '' },
+            { id: '7', name: 'Асула#92795', investments: 241222674500, startScore: 0, endScore: 0, reward: '25G' },
+            { id: '8', name: 'Shadow#24330', investments: 97337374500, startScore: 0, endScore: 0, reward: '' },
+            { id: '9', name: 'selfaa#67769', investments: 243840424500, startScore: 0, endScore: 0, reward: '50G' },
+            { id: '10', name: 'Mihaqlovich#89594', investments: 500117374500, startScore: 0, endScore: 0, reward: '100G' },
+            { id: '11', name: 'Zarya#88899', investments: 641617374500, startScore: 0, endScore: 0, reward: '125G' },
+            { id: '12', name: 'INKI#33936', investments: 358867374500, startScore: 0, endScore: 0, reward: '75G' },
+            { id: '13', name: 'RaineR#73242', investments: 462659374500, startScore: 0, endScore: 0, reward: '50G' },
+            { id: '14', name: 'Алена#20153', investments: 284313374500, startScore: 0, endScore: 0, reward: '25G' },
+            { id: '15', name: 'Алекс#46688', investments: 920007374500, startScore: 0, endScore: 0, reward: '125G' },
+            { id: '16', name: 'Калямбус#3224', investments: 88030874500, startScore: 0, endScore: 0, reward: '' },
+            { id: '17', name: 'Aver1n#93710', investments: 125861370700, startScore: 0, endScore: 0, reward: '15G' },
+            { id: '18', name: 'Сатана#38064', investments: 307767374500, startScore: 0, endScore: 0, reward: '50G' },
+            { id: '19', name: 'Nipi#58068', investments: 163467488400, startScore: 0, endScore: 0, reward: '25G' },
+            { id: '20', name: 'YuryQ#38320', investments: 617395374500, startScore: 0, endScore: 0, reward: '125G' },
+        ];
+
+        // --- ICONS (SVG Components) ---
+        const IconShield = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>;
+        const IconUsers = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+        const IconChart = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>;
+        const IconDices = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="12" height="12" x="2" y="10" rx="2" ry="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01"/><path d="M10 14h.01"/><path d="M15 6h.01"/><path d="M18 9h.01"/></svg>;
+        const IconSparkles = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 5H5"/><path d="M19 21v-4"/><path d="M15 19h4"/></svg>;
+        const IconTrophy = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
+        const IconTrash = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>;
+        const IconPlus = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="M12 5v14"/></svg>;
+        const IconPercent = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="19" x2="5" y1="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>;
+        const IconAlert = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>;
+
+
+        // --- UTILS ---
+        const analyzeLocally = (members) => {
+            if (!members.length) return "Нет данных для анализа.";
+
+            const withDiff = members.map(m => ({
+                ...m,
+                diff: m.endScore - m.investments,
+                name: m.name || "Без имени"
+            }));
+
+            const mvp = withDiff.reduce((prev, current) => (current.diff > prev.diff) ? current : prev, withDiff[0]);
+            const whale = withDiff.reduce((prev, current) => (current.investments > prev.investments) ? current : prev, withDiff[0]);
+            const worst = withDiff.reduce((prev, current) => (current.diff < prev.diff) ? current : prev, withDiff[0]);
+            
+            const totalInvest = withDiff.reduce((acc, m) => acc + m.investments, 0);
+            const totalScore = withDiff.reduce((acc, m) => acc + m.endScore, 0);
+            const totalProfit = totalScore - totalInvest;
+
+            return `
+            <div class="space-y-4">
+                <div class="bg-green-900/20 p-4 rounded border border-green-700/50">
+                    <strong class="text-green-400 block text-lg">🏆 MVP Гильдии</strong>
+                    <span class="text-xl font-bold">${mvp.name}</span>
+                    <div class="text-sm text-gray-400">Прибыль: +${mvp.diff.toLocaleString()}</div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-blue-900/20 p-4 rounded border border-blue-700/50">
+                        <strong class="text-blue-400 block">🐋 Главный Инвестор</strong>
+                        <div class="font-bold">${whale.name}</div>
+                        <div class="text-xs text-gray-400">${whale.investments.toLocaleString()} вложено</div>
+                    </div>
+                    <div class="bg-red-900/20 p-4 rounded border border-red-700/50">
+                        <strong class="text-red-400 block">📉 Требует внимания</strong>
+                        <div class="font-bold">${worst.name}</div>
+                        <div class="text-xs text-gray-400">Убыток: ${worst.diff.toLocaleString()}</div>
+                    </div>
+                </div>
+
+                <div class="bg-guild-900 p-4 rounded">
+                    <strong class="text-gray-300 block mb-2">📊 Сводка по Гильдии</strong>
+                    <ul class="text-sm space-y-1 text-gray-400">
+                        <li>Всего участников: <span class="text-white">${members.length}</span></li>
+                        <li>Общий профит: <span class="${totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}">${totalProfit.toLocaleString()}</span></li>
+                    </ul>
+                </div>
+                
+                <div class="italic text-guild-gold text-center mt-4">
+                    "Удача любит смелых, но награждает подготовленных."
+                </div>
+            </div>
+            `;
+        };
+
+        // --- COMPONENTS ---
+
+        // 1. CSS ROULETTE
+        const Roulette = ({ participants, winner, isSpinning, onSpinComplete }) => {
+            const containerRef = useRef(null);
+            const [tape, setTape] = useState([]);
+            const [spinState, setSpinState] = useState('idle'); // idle, spinning, finished
+
+            const CARD_WIDTH = 180;
+            const GAP = 12;
+            const WINNER_INDEX = 60; // Make list slightly shorter for performance
+
+            useEffect(() => {
+                if (isSpinning && winner && participants.length > 0) {
+                    setSpinState('idle');
+                    
+                    // Generate tape
+                    const buffer = Array.from({ length: WINNER_INDEX }).map(() => 
+                        participants[Math.floor(Math.random() * participants.length)]
+                    );
+                    const newTape = [...buffer, winner, ...participants.slice(0, 5)];
+                    setTape(newTape);
+
+                    // Start animation after a brief tick to allow render
+                    setTimeout(() => {
+                        setSpinState('spinning');
+                        // Duration match CSS transition
+                        setTimeout(() => {
+                            setSpinState('finished');
+                            onSpinComplete();
+                        }, 8000);
+                    }, 100);
+                }
+            }, [isSpinning, winner]);
+
+            const getTransform = () => {
+                if (spinState === 'idle') return 'translateX(0px)';
+                
+                // Calculate position to center the winner
+                const cardFullWidth = CARD_WIDTH + GAP;
+                // We want the WINNER_INDEX card to be in the center
+                // Center of container (approx 50%)
+                // But simplified: just shift left by (Index * Width) minus offset
+                const randomOffset = Math.floor(Math.random() * 40) - 20; // Small jitter
+                const targetX = -1 * (WINNER_INDEX * cardFullWidth) + (containerRef.current ? containerRef.current.offsetWidth / 2 : 300) - (CARD_WIDTH / 2);
+                
+                return `translateX(${targetX + randomOffset}px)`;
+            };
+
+            if (!isSpinning && spinState !== 'finished') {
+                return (
+                    <div className="w-full h-52 bg-guild-900 rounded-xl border border-guild-700 flex items-center justify-center text-gray-500">
+                        Ожидание старта...
+                    </div>
+                );
+            }
+
+            return (
+                <div className="relative w-full max-w-5xl mx-auto mb-8 h-52 bg-guild-900 rounded-xl border border-guild-700 overflow-hidden shadow-2xl" ref={containerRef}>
+                    <div className="absolute top-0 bottom-0 left-1/2 w-1 bg-yellow-500 z-30 transform -translate-x-1/2 shadow-[0_0_15px_rgba(234,179,8,0.8)]"></div>
+                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 text-yellow-500 z-30 text-2xl drop-shadow-md">▼</div>
+                    <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-guild-900 to-transparent z-20 pointer-events-none"></div>
+                    <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-guild-900 to-transparent z-20 pointer-events-none"></div>
+
+                    <div 
+                        className="flex items-center h-full px-4"
+                        style={{
+                            transform: getTransform(),
+                            transition: spinState === 'spinning' ? 'transform 8s cubic-bezier(0.1, 0.9, 0.2, 1)' : 'none',
+                            willChange: 'transform'
+                        }}
+                    >
+                        {tape.map((p, i) => {
+                            const isWinnerCard = spinState === 'finished' && i === WINNER_INDEX;
+                            return (
+                                <div key={i} 
+                                    className={`flex-shrink-0 relative rounded-lg flex flex-col items-center justify-center border-2 transition-all duration-500 ${isWinnerCard ? 'border-yellow-500 bg-yellow-900/30 shadow-[0_0_30px_rgba(234,179,8,0.4)] scale-105 z-10' : 'border-guild-700 bg-guild-800'}`} 
+                                    style={{ width: CARD_WIDTH, height: 160, marginRight: GAP }}
+                                >
+                                    <div className="w-12 h-12 rounded-full bg-guild-700 flex items-center justify-center mb-2 text-lg font-bold text-gray-300 overflow-hidden">
+                                        {p.name[0]}
+                                    </div>
+                                    <div className={`font-bold px-2 text-center truncate w-full ${isWinnerCard ? 'text-yellow-400' : 'text-white'}`}>{p.name}</div>
+                                    <div className="text-xs text-gray-500 mt-1 bg-guild-900/50 px-2 py-1 rounded">Max: {p.score}G</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
+        // 2. CONTEST MANAGER
+        const ContestManager = ({ allParticipants }) => {
+            const [stageIdx, setStageIdx] = useState(0);
+            const [history, setHistory] = useState([]);
+            const [winner, setWinner] = useState(null);
+            const [isSpinning, setIsSpinning] = useState(false);
+            const [winnersFound, setWinnersFound] = useState(0);
+
+            const stage = STAGES[stageIdx];
+            const isFinished = stageIdx >= STAGES.length;
+
+            const getCleanScore = (p) => {
+                if (typeof p.score === 'number') return p.score;
+                const cleanString = String(p.score).replace(/[^0-9]/g, '');
+                return parseInt(cleanString, 10) || 0;
+            };
+
+            const eligible = useMemo(() => {
+                if (isFinished) return [];
+                return allParticipants.filter(p => {
+                    const realScore = getCleanScore(p);
+                    const passesThreshold = realScore >= stage.threshold;
+                    const alreadyWonThisStage = history.some(h => h.name === p.name && h.stage === `${stage.threshold}G`);
+                    return passesThreshold && !alreadyWonThisStage;
+                });
+            }, [allParticipants, stage, isFinished, history]);
+
+            const excludedCount = allParticipants.length - eligible.length;
+            const winChance = eligible.length > 0 ? (100 / eligible.length) : 0;
+
+            const handleSpin = () => {
+                if (!eligible.length) return alert("Нет участников!");
+                const randomWin = eligible[Math.floor(Math.random() * eligible.length)];
+                setWinner(randomWin);
+                setIsSpinning(true);
+            };
+
+            const handleComplete = () => {
+                setIsSpinning(false);
+                if (!winner) return;
+                
+                // Global confetti
+                if(window.confetti) {
+                    window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#fbbf24', '#8b5cf6', '#ffffff'] });
+                }
+
+                setHistory(prev => [...prev, { stage: `${stage.threshold}G`, name: winner.name, prize: stage.prize, score: getCleanScore(winner) }]);
+
+                if (winnersFound + 1 < stage.count) {
+                    setWinnersFound(prev => prev + 1);
+                } else {
+                    setTimeout(() => {
+                        setWinnersFound(0);
+                        setStageIdx(prev => prev + 1);
+                    }, 2000);
+                }
+            };
+
+            if (isFinished) return (
+                <div className="bg-guild-800 p-8 rounded-xl border-2 border-green-500 max-w-4xl mx-auto shadow-2xl text-center animate-fade-in">
+                    <IconTrophy className="w-24 h-24 text-yellow-500 mx-auto mb-4 animate-bounce" />
+                    <h2 className="text-3xl text-green-400 mb-6 font-bold">🏆 ВСЕ ЭТАПЫ ЗАВЕРШЕНЫ</h2>
+                    <div className="grid grid-cols-1 gap-2 text-left">
+                        {history.map((h, i) => (
+                            <div key={i} className="bg-guild-900 p-4 rounded-lg flex justify-between items-center border border-guild-700">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-guild-accent font-mono font-bold w-16">{h.stage}</span>
+                                    <span className="text-white font-bold text-lg">{h.name}</span>
+                                </div>
+                                <span className="text-yellow-400 font-bold">{h.prize}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="w-full max-w-6xl mx-auto space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-gradient-to-br from-blue-900 to-guild-900 p-5 rounded-xl border border-blue-700 shadow-lg relative overflow-hidden">
+                            <div className="relative z-10">
+                                <div className="text-blue-300 text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><IconSparkles className="w-3 h-3" /> {stage.title}</div>
+                                <div className="text-5xl font-black text-white">{stage.threshold}<span className="text-3xl text-blue-400">G</span></div>
+                                <div className="mt-2 text-blue-200 bg-black/20 inline-block px-3 py-1 rounded-lg border border-blue-500/30">Приз: <span className="text-yellow-400 font-bold">{stage.prize}</span></div>
+                            </div>
+                        </div>
+                        <div className="bg-guild-800 p-5 rounded-xl border border-guild-700 flex flex-col justify-center relative">
+                             <div className="text-gray-400 text-xs uppercase mb-2 flex items-center gap-2"><IconTrophy className="w-3 h-3" /> Прогресс этапа</div>
+                             <div className="flex items-end gap-2 z-10">
+                                <span className="text-4xl font-bold text-yellow-500">{winnersFound}</span>
+                                <span className="text-xl text-gray-500 mb-1">/ {stage.count}</span>
+                             </div>
+                             <div className="w-full bg-guild-900 h-2 rounded-full mt-3 overflow-hidden border border-guild-700 z-10">
+                                <div className="bg-yellow-500 h-full transition-all duration-500" style={{ width: `${(winnersFound / stage.count) * 100}%` }}></div>
+                             </div>
+                        </div>
+                        <div className="bg-guild-800 p-5 rounded-xl border border-guild-700 flex flex-col justify-center relative">
+                           <div className="flex justify-between items-center mb-1">
+                             <span className="text-green-400 text-xs font-bold uppercase tracking-wider">Допущены</span>
+                             <span className="text-3xl text-white font-bold">{eligible.length}</span>
+                           </div>
+                           <div className="w-full bg-guild-700 h-px my-2"></div>
+                           <div className="flex justify-between items-center">
+                             <span className="text-red-400 text-xs">Не прошли / Выиграли</span>
+                             <span className="text-lg text-gray-500 font-mono">{excludedCount}</span>
+                           </div>
+                        </div>
+                    </div>
+
+                    <Roulette participants={eligible} winner={winner} isSpinning={isSpinning} onSpinComplete={handleComplete} />
+
+                    <div className="flex justify-center">
+                        <button onClick={handleSpin} disabled={isSpinning || eligible.length === 0} className={`relative overflow-hidden px-16 py-5 rounded-2xl text-2xl font-bold uppercase tracking-widest shadow-2xl transition-all transform ${isSpinning || eligible.length === 0 ? 'bg-guild-800 text-gray-600 cursor-not-allowed border border-guild-700' : 'bg-gradient-to-r from-guild-accent to-indigo-600 text-white hover:scale-105 ring-1 ring-indigo-400/50'}`}>
+                            <span className="relative z-10 flex items-center gap-3">{isSpinning ? 'Вращаем...' : 'Разыграть приз'}{!isSpinning && <IconSparkles className="w-5 h-5 text-yellow-300" />}</span>
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 bg-guild-800 rounded-xl border border-guild-700 overflow-hidden shadow-lg">
+                            <div className="p-4 border-b border-guild-700 bg-guild-900/50 flex justify-between items-center">
+                                <h3 className="font-bold text-white flex items-center gap-2"><IconPercent className="w-5 h-5 text-guild-accent" /> Шансы на победу</h3>
+                                <span className="text-xs bg-guild-900 text-gray-400 px-2 py-1 rounded border border-guild-700">Всего: {eligible.length}</span>
+                            </div>
+                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-guild-900 text-gray-400 sticky top-0">
+                                        <tr><th className="p-3">Участник</th><th className="p-3 text-center">Лимит</th><th className="p-3 w-2/5">Вероятность</th></tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-guild-700/50">
+                                        {eligible.map((p) => (
+                                            <tr key={p.id} className="hover:bg-guild-700/30 transition-colors">
+                                                <td className="p-3 text-white font-medium">{p.name}</td>
+                                                <td className="p-3 text-center"><span className="bg-guild-900 px-2 py-1 rounded text-xs font-mono text-gray-300 border border-guild-700">{getCleanScore(p)}G</span></td>
+                                                <td className="p-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex-1 h-2 bg-guild-900 rounded-full overflow-hidden border border-guild-800">
+                                                            <div className="h-full bg-guild-accent rounded-full" style={{ width: `${Math.max(winChance, 2)}%` }}></div>
+                                                        </div>
+                                                        <span className="text-xs font-mono font-bold text-guild-accent w-12 text-right">{winChance.toFixed(1)}%</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div className="bg-guild-800 rounded-xl border border-guild-700 overflow-hidden shadow-lg">
+                             <div className="p-4 border-b border-guild-700 bg-guild-900/50"><h3 className="font-bold text-white flex items-center gap-2"><IconUsers className="w-5 h-5 text-gray-400" /> История побед</h3></div>
+                             <div className="p-4 max-h-[300px] overflow-y-auto custom-scrollbar space-y-2">
+                                {history.slice().reverse().map((h, i) => (
+                                    <div key={i} className="flex justify-between items-center bg-guild-900/50 p-3 rounded border border-guild-700/50">
+                                        <div><div className="text-white font-bold text-sm">{h.name}</div><div className="text-[10px] text-gray-500 uppercase">{h.stage}</div></div>
+                                        <div className="text-yellow-400 font-bold text-sm">{h.prize}</div>
+                                    </div>
+                                ))}
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 3. STATS CHART (Pure CSS)
+        const StatsChart = ({ members }) => {
+            const data = members.map(m => ({ ...m, diff: m.endScore - m.investments })).sort((a, b) => b.diff - a.diff).slice(0, 15);
+            
+            // Find max value for scaling
+            const maxVal = Math.max(...data.map(d => Math.abs(d.diff)));
+
+            return (
+                <div className="w-full bg-guild-800 p-4 rounded-xl border border-guild-700 shadow-lg">
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">📊 Топ активности (Итог - Вложения)</h3>
+                    <div className="space-y-3">
+                        {data.map((d, i) => {
+                            const percent = Math.abs(d.diff) / maxVal * 100;
+                            const isPositive = d.diff >= 0;
+                            const barColor = d.diff < 0 ? 'bg-red-500' : i === 0 ? 'bg-yellow-500' : i === 1 ? 'bg-gray-300' : i === 2 ? 'bg-orange-600' : 'bg-indigo-500';
+
+                            return (
+                                <div key={d.id} className="flex items-center text-sm">
+                                    <div className="w-32 truncate text-gray-300 font-medium">{d.name}</div>
+                                    <div className="flex-1 h-6 bg-guild-900 rounded-sm relative mx-2">
+                                        <div 
+                                            className={`h-full rounded-sm absolute ${barColor} transition-all duration-500`}
+                                            style={{ 
+                                                width: `${percent}%`, 
+                                                left: isPositive ? '0' : 'auto', 
+                                                right: isPositive ? 'auto' : '0' // Simplified visual for positive, for full logic use center axis
+                                            }}
+                                        ></div>
+                                        <div className="absolute inset-0 flex items-center px-2">
+                                           <span className="text-xs text-white drop-shadow-md font-bold">{d.diff.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
+        // 4. GUILD MANAGER
+        const GuildManager = ({ members, setMembers, dates, setDates }) => {
+            const handleAddMember = () => setMembers([...members, { id: Date.now().toString(), name: 'Новый Игрок', investments: 0, startScore: 0, endScore: 0, reward: '' }]);
+            const handleRemoveMember = (id) => setMembers(members.filter(m => m.id !== id));
+            const updateMember = (id, field, value) => setMembers(members.map(m => m.id === id ? { ...m, [field]: value } : m));
+            const formatNumber = (num) => num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            const parseNumber = (value) => { const cleaned = value.replace(/\s/g, ''); return cleaned === '' ? 0 : parseInt(cleaned, 10); };
+
+            return (
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden text-black">
+                    <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-gray-100 border-b-2 border-gray-300 text-black">
+                                    <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6">Ник</th>
+                                    <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6">Вложения</th>
+                                    <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6">Промежуточный</th>
+                                    <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6">Итоговый</th>
+                                    <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6 bg-blue-50 text-blue-900">Разница</th>
+                                    <th className="px-4 py-2 text-left font-bold border-gray-300 w-1/6">15 - 125G</th>
+                                    <th className="w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {members.map((member, index) => {
+                                    const difference = member.endScore - member.investments;
+                                    const diffClass = difference > 0 ? 'text-green-700 font-bold' : difference < 0 ? 'text-red-700' : 'text-black';
+                                    return (
+                                        <tr key={member.id} className={`border-b border-gray-200 hover:bg-blue-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                                            <td className="border-r border-gray-200 p-1"><input type="text" value={member.name} onChange={(e) => updateMember(member.id, 'name', e.target.value)} className="w-full px-2 py-1 outline-none bg-transparent font-medium text-black" /></td>
+                                            <td className="border-r border-gray-200 p-1"><input type="text" value={formatNumber(member.investments)} onChange={(e) => { const val = parseNumber(e.target.value); if (!isNaN(val)) updateMember(member.id, 'investments', val); }} className="w-full px-2 py-1 outline-none bg-transparent font-mono text-right text-black" /></td>
+                                            <td className="border-r border-gray-200 p-1"><input type="number" value={member.startScore || ''} onChange={(e) => updateMember(member.id, 'startScore', parseInt(e.target.value) || 0)} className="w-full px-2 py-1 outline-none bg-transparent text-center text-black" placeholder="0" /></td>
+                                            <td className="border-r border-gray-200 p-1"><input type="number" value={member.endScore || ''} onChange={(e) => updateMember(member.id, 'endScore', parseInt(e.target.value) || 0)} className="w-full px-2 py-1 outline-none bg-transparent text-center text-black" placeholder="0" /></td>
+                                            <td className={`border-r border-gray-200 p-2 text-center bg-blue-50/50 ${diffClass}`}>{formatNumber(difference)}</td>
+                                            <td className="border-r border-gray-200 p-1"><input type="text" value={member.reward} onChange={(e) => updateMember(member.id, 'reward', e.target.value)} className="w-full px-2 py-1 outline-none bg-transparent text-black" placeholder="-" /></td>
+                                            <td className="p-1 text-center"><button onClick={() => handleRemoveMember(member.id)} className="text-red-500 hover:text-red-700 p-1 rounded"><IconTrash className="w-4 h-4" /></button></td>
+                                        </tr>
+                                    );
+                                })}
+                                <tr className="bg-gray-50">
+                                    <td colSpan={7} className="p-2 text-center border-t border-gray-300"><button onClick={handleAddMember} className="flex items-center justify-center gap-2 w-full text-gray-600 hover:text-black py-2 font-medium transition-colors"><IconPlus className="w-4 h-4" /> Добавить строку</button></td>
+                                </tr>
+                            </tbody>
+                            <tfoot className="bg-white border-t-2 border-gray-300">
+                                <tr>
+                                    <td className="border-r border-gray-200"></td><td className="border-r border-gray-200"></td>
+                                    <td className="border-r border-gray-200 p-2"><input type="text" value={dates.start} onChange={(e) => setDates({...dates, start: e.target.value})} className="w-full text-center italic text-black text-xs outline-none border-b border-transparent focus:border-blue-400" /></td>
+                                    <td className="border-r border-gray-200 p-2"><input type="text" value={dates.end} onChange={(e) => setDates({...dates, end: e.target.value})} className="w-full text-center italic text-black text-xs outline-none border-b border-transparent focus:border-blue-400" /></td>
+                                    <td colSpan={3}></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        // 5. LOTTERY SYSTEM
+        const LotterySystem = ({ members }) => {
+            const parseLimit = (value) => { if (!value) return 0; const numbers = value.replace(/\D/g, ''); return numbers ? parseInt(numbers, 10) : 0; };
+            const participants = members.map(m => ({ id: m.id, name: m.name, score: parseLimit(m.reward) })).filter(p => p.score > 0);
+
+            return (
+                <div className="w-full">
+                    <div className="mb-8 bg-blue-900/20 border border-blue-500/20 p-4 rounded-lg">
+                        <p className="text-sm text-blue-200">ℹ️ <strong>Правила участия:</strong> Колонка <strong>"15 - 125G"</strong> — максимальный уровень допуска.</p>
+                    </div>
+                    <ContestManager allParticipants={participants} />
+                </div>
+            );
+        };
+
+        // 6. APP
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('members');
+            const [members, setMembers] = useState(INITIAL_MEMBERS);
+            const [aiAnalysis, setAiAnalysis] = useState('');
+            const [dates, setDates] = useState({ start: '15.11.2025', end: '01.01.2026' });
+
+            const handleAnalyze = () => {
+                // Use local math logic
+                const result = analyzeLocally(members);
+                setAiAnalysis(result);
+            };
+
+            return (
+                <div className="min-h-screen bg-guild-900 text-gray-100 font-sans pb-12">
+                    <header className="bg-guild-800 border-b border-guild-700 sticky top-0 z-50 shadow-md">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-guild-accent p-2 rounded-lg"><IconShield className="w-6 h-6 text-white" /></div>
+                                <h1 className="text-xl font-bold tracking-wide text-white">Guild<span className="text-guild-accent">Master</span></h1>
+                            </div>
+                            <nav className="flex gap-1 md:gap-4">
+                                <button onClick={() => setActiveTab('members')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'members' ? 'bg-guild-700 text-white shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-guild-800'}`}><IconUsers className="w-4 h-4" /><span className="hidden md:inline">Таблица</span></button>
+                                <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'stats' ? 'bg-guild-700 text-white shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-guild-800'}`}><IconChart className="w-4 h-4" /><span className="hidden md:inline">Статистика</span></button>
+                                <button onClick={() => setActiveTab('lottery')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'lottery' ? 'bg-guild-700 text-white shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-guild-800'}`}><IconDices className="w-4 h-4" /><span className="hidden md:inline">Розыгрыш</span></button>
+                            </nav>
+                        </div>
+                    </header>
+                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        <div className="animate-fade-in">
+                            {activeTab === 'members' && <div className="space-y-6"><GuildManager members={members} setMembers={setMembers} dates={dates} setDates={setDates} /></div>}
+                            {activeTab === 'stats' && (
+                                <div className="space-y-8">
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                        <h2 className="text-2xl font-bold text-white">Анализ Прогресса</h2>
+                                        <button onClick={handleAnalyze} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"><IconSparkles className="w-4 h-4" />Сгенерировать отчет</button>
+                                    </div>
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                        <StatsChart members={members} />
+                                        <div className="bg-guild-800 p-6 rounded-xl border border-guild-700 shadow-lg min-h-[400px]">
+                                            <h3 className="text-xl font-bold text-white mb-4 border-b border-guild-700 pb-2">Отчет</h3>
+                                            {aiAnalysis ? <div className="prose prose-invert prose-sm max-w-none"><div dangerouslySetInnerHTML={{ __html: aiAnalysis }} /></div> : <div className="flex flex-col items-center justify-center h-[300px] text-gray-500"><IconSparkles className="w-12 h-12 mb-4 opacity-20" /><p className="text-center max-w-xs">Нажмите кнопку выше для анализа.</p></div>}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {activeTab === 'lottery' && (
+                                <div className="space-y-6">
+                                    <div className="mb-4"><h2 className="text-2xl font-bold text-white">Великий Рандом</h2></div>
+                                    <LotterySystem members={members} />
+                                </div>
+                            )}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
