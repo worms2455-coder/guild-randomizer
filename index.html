@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GuildMaster Randomizer (Standalone)</title>
+    <title>GuildMaster Online (Firebase)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -28,7 +28,7 @@
         }
     </script>
 
-    <!-- React & ReactDOM (UMD Development for file:// compatibility) -->
+    <!-- React & ReactDOM (UMD) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
@@ -40,13 +40,11 @@
 
     <style>
         body { background-color: #0f172a; color: #e2e8f0; }
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
-        /* Animations */
         @keyframes shine {
             0% { transform: translateX(-100%) }
             100% { transform: translateX(100%) }
@@ -56,16 +54,37 @@
             0% { opacity: 0; transform: translateY(10px); }
             100% { opacity: 1; transform: translateY(0); }
         }
+        .loader {
+            border: 4px solid #1e293b;
+            border-top: 4px solid #8b5cf6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Inputs in viewer mode look like text */
+        .viewer-input {
+            background: transparent !important;
+            border: none !important;
+            color: #e2e8f0 !important;
+            pointer-events: none;
+        }
     </style>
-<script type="importmap">
+
+    <!-- Import Map for Firebase -->
+    <script type="importmap">
 {
   "imports": {
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js",
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
     "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
     "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24",
     "canvas-confetti": "https://aistudiocdn.com/canvas-confetti@^1.9.4"
   }
@@ -75,8 +94,37 @@
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from 'firebase/app';
+        import { 
+            getFirestore, 
+            collection, 
+            onSnapshot, 
+            addDoc, 
+            updateDoc, 
+            deleteDoc, 
+            setDoc,
+            doc, 
+            query, 
+            orderBy, 
+            serverTimestamp 
+        } from 'firebase/firestore';
+
         const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- FIREBASE CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCIFKGZioiflKAAA1tHkIZV0u1sMiPzUjo",
+            authDomain: "random-3fbaa.firebaseapp.com",
+            projectId: "random-3fbaa",
+            storageBucket: "random-3fbaa.firebasestorage.app",
+            messagingSenderId: "891768940412",
+            appId: "1:891768940412:web:312585e31aade1d7df66f9"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
         // --- DATA CONSTANTS ---
         const STAGES = [
@@ -88,30 +136,7 @@
             { threshold: 125, prize: "2000 💎", count: 1, title: "ЛЕГЕНДА" },
         ];
 
-        const INITIAL_MEMBERS = [
-            { id: '1', name: 'Фасоль#51817', investments: 150818174500, startScore: 0, endScore: 0, reward: '100G' },
-            { id: '2', name: 'Мяу#97418', investments: 723767374500, startScore: 0, endScore: 0, reward: '125G' },
-            { id: '3', name: 'dimandorf#98147', investments: 347739374500, startScore: 0, endScore: 0, reward: '50G' },
-            { id: '4', name: 'Nezhdanchick#90542', investments: 121985674500, startScore: 0, endScore: 0, reward: '15G' },
-            { id: '5', name: 'Дэментор#5030', investments: 375947374500, startScore: 0, endScore: 0, reward: '75G' },
-            { id: '6', name: 'Adanei#72323', investments: 60665339100, startScore: 0, endScore: 0, reward: '' },
-            { id: '7', name: 'Асула#92795', investments: 241222674500, startScore: 0, endScore: 0, reward: '25G' },
-            { id: '8', name: 'Shadow#24330', investments: 97337374500, startScore: 0, endScore: 0, reward: '' },
-            { id: '9', name: 'selfaa#67769', investments: 243840424500, startScore: 0, endScore: 0, reward: '50G' },
-            { id: '10', name: 'Mihaqlovich#89594', investments: 500117374500, startScore: 0, endScore: 0, reward: '100G' },
-            { id: '11', name: 'Zarya#88899', investments: 641617374500, startScore: 0, endScore: 0, reward: '125G' },
-            { id: '12', name: 'INKI#33936', investments: 358867374500, startScore: 0, endScore: 0, reward: '75G' },
-            { id: '13', name: 'RaineR#73242', investments: 462659374500, startScore: 0, endScore: 0, reward: '50G' },
-            { id: '14', name: 'Алена#20153', investments: 284313374500, startScore: 0, endScore: 0, reward: '25G' },
-            { id: '15', name: 'Алекс#46688', investments: 920007374500, startScore: 0, endScore: 0, reward: '125G' },
-            { id: '16', name: 'Калямбус#3224', investments: 88030874500, startScore: 0, endScore: 0, reward: '' },
-            { id: '17', name: 'Aver1n#93710', investments: 125861370700, startScore: 0, endScore: 0, reward: '15G' },
-            { id: '18', name: 'Сатана#38064', investments: 307767374500, startScore: 0, endScore: 0, reward: '50G' },
-            { id: '19', name: 'Nipi#58068', investments: 163467488400, startScore: 0, endScore: 0, reward: '25G' },
-            { id: '20', name: 'YuryQ#38320', investments: 617395374500, startScore: 0, endScore: 0, reward: '125G' },
-        ];
-
-        // --- ICONS (SVG Components) ---
+        // --- ICONS (SVG) ---
         const IconShield = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>;
         const IconUsers = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
         const IconChart = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>;
@@ -121,23 +146,17 @@
         const IconTrash = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>;
         const IconPlus = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="M12 5v14"/></svg>;
         const IconPercent = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="19" x2="5" y1="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>;
-        const IconAlert = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>;
-
+        const IconCloud = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>;
+        const IconLock = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+        const IconUnlock = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>;
 
         // --- UTILS ---
         const analyzeLocally = (members) => {
             if (!members.length) return "Нет данных для анализа.";
-
-            const withDiff = members.map(m => ({
-                ...m,
-                diff: m.endScore - m.investments,
-                name: m.name || "Без имени"
-            }));
-
+            const withDiff = members.map(m => ({ ...m, diff: m.endScore - m.investments, name: m.name || "Без имени" }));
             const mvp = withDiff.reduce((prev, current) => (current.diff > prev.diff) ? current : prev, withDiff[0]);
             const whale = withDiff.reduce((prev, current) => (current.investments > prev.investments) ? current : prev, withDiff[0]);
             const worst = withDiff.reduce((prev, current) => (current.diff < prev.diff) ? current : prev, withDiff[0]);
-            
             const totalInvest = withDiff.reduce((acc, m) => acc + m.investments, 0);
             const totalScore = withDiff.reduce((acc, m) => acc + m.endScore, 0);
             const totalProfit = totalScore - totalInvest;
@@ -149,7 +168,6 @@
                     <span class="text-xl font-bold">${mvp.name}</span>
                     <div class="text-sm text-gray-400">Прибыль: +${mvp.diff.toLocaleString()}</div>
                 </div>
-
                 <div class="grid grid-cols-2 gap-4">
                     <div class="bg-blue-900/20 p-4 rounded border border-blue-700/50">
                         <strong class="text-blue-400 block">🐋 Главный Инвестор</strong>
@@ -162,78 +180,61 @@
                         <div class="text-xs text-gray-400">Убыток: ${worst.diff.toLocaleString()}</div>
                     </div>
                 </div>
-
                 <div class="bg-guild-900 p-4 rounded">
-                    <strong class="text-gray-300 block mb-2">📊 Сводка по Гильдии</strong>
+                    <strong class="text-gray-300 block mb-2">📊 Сводка</strong>
                     <ul class="text-sm space-y-1 text-gray-400">
                         <li>Всего участников: <span class="text-white">${members.length}</span></li>
                         <li>Общий профит: <span class="${totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}">${totalProfit.toLocaleString()}</span></li>
                     </ul>
                 </div>
-                
-                <div class="italic text-guild-gold text-center mt-4">
-                    "Удача любит смелых, но награждает подготовленных."
-                </div>
-            </div>
-            `;
+            </div>`;
         };
 
         // --- COMPONENTS ---
 
-        // 1. CSS ROULETTE
+        // 1. ROULETTE
         const Roulette = ({ participants, winner, isSpinning, onSpinComplete }) => {
             const containerRef = useRef(null);
             const [tape, setTape] = useState([]);
-            const [spinState, setSpinState] = useState('idle'); // idle, spinning, finished
+            const [spinState, setSpinState] = useState('idle');
 
             const CARD_WIDTH = 180;
             const GAP = 12;
-            const WINNER_INDEX = 60; // Make list slightly shorter for performance
+            const WINNER_INDEX = 60;
 
             useEffect(() => {
                 if (isSpinning && winner && participants.length > 0) {
                     setSpinState('idle');
-                    
-                    // Generate tape
-                    const buffer = Array.from({ length: WINNER_INDEX }).map(() => 
-                        participants[Math.floor(Math.random() * participants.length)]
-                    );
+                    // Generate tape deterministically or randomly, doesn't matter visually as long as winner lines up
+                    const buffer = Array.from({ length: WINNER_INDEX }).map(() => participants[Math.floor(Math.random() * participants.length)]);
                     const newTape = [...buffer, winner, ...participants.slice(0, 5)];
                     setTape(newTape);
-
-                    // Start animation after a brief tick to allow render
+                    
+                    // Start animation sequence
                     setTimeout(() => {
                         setSpinState('spinning');
-                        // Duration match CSS transition
+                        // Animation duration is fixed at 8s
                         setTimeout(() => {
                             setSpinState('finished');
                             onSpinComplete();
                         }, 8000);
                     }, 100);
+                } else if (!isSpinning) {
+                    // Reset when not spinning
+                    setSpinState('idle');
                 }
-            }, [isSpinning, winner]);
+            }, [isSpinning, winner]); // React to external spinning state
 
             const getTransform = () => {
                 if (spinState === 'idle') return 'translateX(0px)';
-                
-                // Calculate position to center the winner
                 const cardFullWidth = CARD_WIDTH + GAP;
-                // We want the WINNER_INDEX card to be in the center
-                // Center of container (approx 50%)
-                // But simplified: just shift left by (Index * Width) minus offset
-                const randomOffset = Math.floor(Math.random() * 40) - 20; // Small jitter
+                // We add a small random offset to make it look analog, but centered on winner
+                const randomOffset = Math.floor(Math.random() * 40) - 20; 
                 const targetX = -1 * (WINNER_INDEX * cardFullWidth) + (containerRef.current ? containerRef.current.offsetWidth / 2 : 300) - (CARD_WIDTH / 2);
-                
                 return `translateX(${targetX + randomOffset}px)`;
             };
 
-            if (!isSpinning && spinState !== 'finished') {
-                return (
-                    <div className="w-full h-52 bg-guild-900 rounded-xl border border-guild-700 flex items-center justify-center text-gray-500">
-                        Ожидание старта...
-                    </div>
-                );
-            }
+            if (!isSpinning && spinState !== 'finished') return <div className="w-full h-52 bg-guild-900 rounded-xl border border-guild-700 flex items-center justify-center text-gray-500">Ожидание старта от Админа...</div>;
 
             return (
                 <div className="relative w-full max-w-5xl mx-auto mb-8 h-52 bg-guild-900 rounded-xl border border-guild-700 overflow-hidden shadow-2xl" ref={containerRef}>
@@ -241,25 +242,12 @@
                     <div className="absolute top-0 left-1/2 transform -translate-x-1/2 text-yellow-500 z-30 text-2xl drop-shadow-md">▼</div>
                     <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-guild-900 to-transparent z-20 pointer-events-none"></div>
                     <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-guild-900 to-transparent z-20 pointer-events-none"></div>
-
-                    <div 
-                        className="flex items-center h-full px-4"
-                        style={{
-                            transform: getTransform(),
-                            transition: spinState === 'spinning' ? 'transform 8s cubic-bezier(0.1, 0.9, 0.2, 1)' : 'none',
-                            willChange: 'transform'
-                        }}
-                    >
+                    <div className="flex items-center h-full px-4" style={{ transform: getTransform(), transition: spinState === 'spinning' ? 'transform 8s cubic-bezier(0.1, 0.9, 0.2, 1)' : 'none', willChange: 'transform' }}>
                         {tape.map((p, i) => {
                             const isWinnerCard = spinState === 'finished' && i === WINNER_INDEX;
                             return (
-                                <div key={i} 
-                                    className={`flex-shrink-0 relative rounded-lg flex flex-col items-center justify-center border-2 transition-all duration-500 ${isWinnerCard ? 'border-yellow-500 bg-yellow-900/30 shadow-[0_0_30px_rgba(234,179,8,0.4)] scale-105 z-10' : 'border-guild-700 bg-guild-800'}`} 
-                                    style={{ width: CARD_WIDTH, height: 160, marginRight: GAP }}
-                                >
-                                    <div className="w-12 h-12 rounded-full bg-guild-700 flex items-center justify-center mb-2 text-lg font-bold text-gray-300 overflow-hidden">
-                                        {p.name[0]}
-                                    </div>
+                                <div key={i} className={`flex-shrink-0 relative rounded-lg flex flex-col items-center justify-center border-2 transition-all duration-500 ${isWinnerCard ? 'border-yellow-500 bg-yellow-900/30 shadow-[0_0_30px_rgba(234,179,8,0.4)] scale-105 z-10' : 'border-guild-700 bg-guild-800'}`} style={{ width: CARD_WIDTH, height: 160, marginRight: GAP }}>
+                                    <div className="w-12 h-12 rounded-full bg-guild-700 flex items-center justify-center mb-2 text-lg font-bold text-gray-300 overflow-hidden">{p.name[0]}</div>
                                     <div className={`font-bold px-2 text-center truncate w-full ${isWinnerCard ? 'text-yellow-400' : 'text-white'}`}>{p.name}</div>
                                     <div className="text-xs text-gray-500 mt-1 bg-guild-900/50 px-2 py-1 rounded">Max: {p.score}G</div>
                                 </div>
@@ -271,15 +259,34 @@
         };
 
         // 2. CONTEST MANAGER
-        const ContestManager = ({ allParticipants }) => {
+        const ContestManager = ({ allParticipants, history, isAdmin }) => {
             const [stageIdx, setStageIdx] = useState(0);
-            const [history, setHistory] = useState([]);
+            const [winnersFound, setWinnersFound] = useState(0);
+            
+            // State synced from Firebase
             const [winner, setWinner] = useState(null);
             const [isSpinning, setIsSpinning] = useState(false);
-            const [winnersFound, setWinnersFound] = useState(0);
-
+            
             const stage = STAGES[stageIdx];
             const isFinished = stageIdx >= STAGES.length;
+
+            // LISTEN TO GAME STATE (ROULETTE TRIGGER)
+            useEffect(() => {
+                const unsubscribe = onSnapshot(doc(db, "state", "roulette"), (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        // Only trigger if data has changed substantially (e.g. new timestamp or isSpinning toggle)
+                        if (data.isSpinning) {
+                            setWinner(data.winner);
+                            setIsSpinning(true);
+                        } else {
+                            // Reset locally if db says not spinning (usually happens manually or after reset)
+                            setIsSpinning(false);
+                        }
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
 
             const getCleanScore = (p) => {
                 if (typeof p.score === 'number') return p.score;
@@ -300,24 +307,51 @@
             const excludedCount = allParticipants.length - eligible.length;
             const winChance = eligible.length > 0 ? (100 / eligible.length) : 0;
 
-            const handleSpin = () => {
+            // ADMIN ONLY: Calculates winner and writes to Firestore
+            const handleSpin = async () => {
+                if (!isAdmin) return;
                 if (!eligible.length) return alert("Нет участников!");
+                
                 const randomWin = eligible[Math.floor(Math.random() * eligible.length)];
-                setWinner(randomWin);
-                setIsSpinning(true);
+                
+                // Write to DB to trigger everyone's animation
+                await setDoc(doc(db, "state", "roulette"), {
+                    isSpinning: true,
+                    winner: randomWin,
+                    timestamp: Date.now() // Forces update
+                });
             };
 
-            const handleComplete = () => {
-                setIsSpinning(false);
+            // Executes locally for everyone when animation ends
+            const handleComplete = async () => {
                 if (!winner) return;
                 
-                // Global confetti
-                if(window.confetti) {
-                    window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#fbbf24', '#8b5cf6', '#ffffff'] });
+                if(window.confetti) window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#fbbf24', '#8b5cf6', '#ffffff'] });
+
+                // Logic to advance stage is local visual mainly, but admin commits to history
+                if (isAdmin) {
+                    // SAVE TO FIRESTORE (Only Admin saves to prevent duplicate entries)
+                    try {
+                        await addDoc(collection(db, "history"), {
+                            stage: `${stage.threshold}G`,
+                            name: winner.name,
+                            prize: stage.prize,
+                            score: getCleanScore(winner),
+                            timestamp: serverTimestamp()
+                        });
+                        
+                        // Reset the spinner state in DB so it can be spun again later
+                        // We wait a bit so the confetti finishes
+                        setTimeout(async () => {
+                             await updateDoc(doc(db, "state", "roulette"), {
+                                isSpinning: false
+                            });
+                        }, 5000);
+                        
+                    } catch(e) { console.error("Error saving winner:", e); }
                 }
 
-                setHistory(prev => [...prev, { stage: `${stage.threshold}G`, name: winner.name, prize: stage.prize, score: getCleanScore(winner) }]);
-
+                // Local Stage Logic (Optimistic UI)
                 if (winnersFound + 1 < stage.count) {
                     setWinnersFound(prev => prev + 1);
                 } else {
@@ -332,17 +366,7 @@
                 <div className="bg-guild-800 p-8 rounded-xl border-2 border-green-500 max-w-4xl mx-auto shadow-2xl text-center animate-fade-in">
                     <IconTrophy className="w-24 h-24 text-yellow-500 mx-auto mb-4 animate-bounce" />
                     <h2 className="text-3xl text-green-400 mb-6 font-bold">🏆 ВСЕ ЭТАПЫ ЗАВЕРШЕНЫ</h2>
-                    <div className="grid grid-cols-1 gap-2 text-left">
-                        {history.map((h, i) => (
-                            <div key={i} className="bg-guild-900 p-4 rounded-lg flex justify-between items-center border border-guild-700">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-guild-accent font-mono font-bold w-16">{h.stage}</span>
-                                    <span className="text-white font-bold text-lg">{h.name}</span>
-                                </div>
-                                <span className="text-yellow-400 font-bold">{h.prize}</span>
-                            </div>
-                        ))}
-                    </div>
+                    <p className="text-gray-400">Вся история побед сохранена в базе данных.</p>
                 </div>
             );
 
@@ -381,11 +405,18 @@
 
                     <Roulette participants={eligible} winner={winner} isSpinning={isSpinning} onSpinComplete={handleComplete} />
 
-                    <div className="flex justify-center">
-                        <button onClick={handleSpin} disabled={isSpinning || eligible.length === 0} className={`relative overflow-hidden px-16 py-5 rounded-2xl text-2xl font-bold uppercase tracking-widest shadow-2xl transition-all transform ${isSpinning || eligible.length === 0 ? 'bg-guild-800 text-gray-600 cursor-not-allowed border border-guild-700' : 'bg-gradient-to-r from-guild-accent to-indigo-600 text-white hover:scale-105 ring-1 ring-indigo-400/50'}`}>
-                            <span className="relative z-10 flex items-center gap-3">{isSpinning ? 'Вращаем...' : 'Разыграть приз'}{!isSpinning && <IconSparkles className="w-5 h-5 text-yellow-300" />}</span>
-                        </button>
-                    </div>
+                    {/* BUTTON VISIBLE ONLY TO ADMIN */}
+                    {isAdmin ? (
+                        <div className="flex justify-center">
+                            <button onClick={handleSpin} disabled={isSpinning || eligible.length === 0} className={`relative overflow-hidden px-16 py-5 rounded-2xl text-2xl font-bold uppercase tracking-widest shadow-2xl transition-all transform ${isSpinning || eligible.length === 0 ? 'bg-guild-800 text-gray-600 cursor-not-allowed border border-guild-700' : 'bg-gradient-to-r from-guild-accent to-indigo-600 text-white hover:scale-105 ring-1 ring-indigo-400/50'}`}>
+                                <span className="relative z-10 flex items-center gap-3">{isSpinning ? 'Вращаем...' : 'Разыграть приз'}{!isSpinning && <IconSparkles className="w-5 h-5 text-yellow-300" />}</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="text-center text-gray-500 italic">
+                            {isSpinning ? "Идет розыгрыш..." : "Ожидание запуска администратором..."}
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-guild-800 rounded-xl border border-guild-700 overflow-hidden shadow-lg">
@@ -418,10 +449,11 @@
                             </div>
                         </div>
                         <div className="bg-guild-800 rounded-xl border border-guild-700 overflow-hidden shadow-lg">
-                             <div className="p-4 border-b border-guild-700 bg-guild-900/50"><h3 className="font-bold text-white flex items-center gap-2"><IconUsers className="w-5 h-5 text-gray-400" /> История побед</h3></div>
+                             <div className="p-4 border-b border-guild-700 bg-guild-900/50"><h3 className="font-bold text-white flex items-center gap-2"><IconUsers className="w-5 h-5 text-gray-400" /> История (DB)</h3></div>
                              <div className="p-4 max-h-[300px] overflow-y-auto custom-scrollbar space-y-2">
-                                {history.slice().reverse().map((h, i) => (
-                                    <div key={i} className="flex justify-between items-center bg-guild-900/50 p-3 rounded border border-guild-700/50">
+                                {history.length === 0 && <div className="text-gray-500 text-center text-sm">История пуста</div>}
+                                {history.map((h, i) => (
+                                    <div key={i} className="flex justify-between items-center bg-guild-900/50 p-3 rounded border border-guild-700/50 animate-fade-in">
                                         <div><div className="text-white font-bold text-sm">{h.name}</div><div className="text-[10px] text-gray-500 uppercase">{h.stage}</div></div>
                                         <div className="text-yellow-400 font-bold text-sm">{h.prize}</div>
                                     </div>
@@ -433,12 +465,10 @@
             );
         };
 
-        // 3. STATS CHART (Pure CSS)
+        // 3. STATS CHART
         const StatsChart = ({ members }) => {
             const data = members.map(m => ({ ...m, diff: m.endScore - m.investments })).sort((a, b) => b.diff - a.diff).slice(0, 15);
-            
-            // Find max value for scaling
-            const maxVal = Math.max(...data.map(d => Math.abs(d.diff)));
+            const maxVal = Math.max(...data.map(d => Math.abs(d.diff))) || 1;
 
             return (
                 <div className="w-full bg-guild-800 p-4 rounded-xl border border-guild-700 shadow-lg">
@@ -448,22 +478,12 @@
                             const percent = Math.abs(d.diff) / maxVal * 100;
                             const isPositive = d.diff >= 0;
                             const barColor = d.diff < 0 ? 'bg-red-500' : i === 0 ? 'bg-yellow-500' : i === 1 ? 'bg-gray-300' : i === 2 ? 'bg-orange-600' : 'bg-indigo-500';
-
                             return (
                                 <div key={d.id} className="flex items-center text-sm">
                                     <div className="w-32 truncate text-gray-300 font-medium">{d.name}</div>
                                     <div className="flex-1 h-6 bg-guild-900 rounded-sm relative mx-2">
-                                        <div 
-                                            className={`h-full rounded-sm absolute ${barColor} transition-all duration-500`}
-                                            style={{ 
-                                                width: `${percent}%`, 
-                                                left: isPositive ? '0' : 'auto', 
-                                                right: isPositive ? 'auto' : '0' // Simplified visual for positive, for full logic use center axis
-                                            }}
-                                        ></div>
-                                        <div className="absolute inset-0 flex items-center px-2">
-                                           <span className="text-xs text-white drop-shadow-md font-bold">{d.diff.toLocaleString()}</span>
-                                        </div>
+                                        <div className={`h-full rounded-sm absolute ${barColor} transition-all duration-500`} style={{ width: `${percent}%`, left: isPositive ? '0' : 'auto', right: isPositive ? 'auto' : '0' }}></div>
+                                        <div className="absolute inset-0 flex items-center px-2"><span className="text-xs text-white drop-shadow-md font-bold">{d.diff.toLocaleString()}</span></div>
                                     </div>
                                 </div>
                             );
@@ -473,13 +493,33 @@
             );
         };
 
-        // 4. GUILD MANAGER
-        const GuildManager = ({ members, setMembers, dates, setDates }) => {
-            const handleAddMember = () => setMembers([...members, { id: Date.now().toString(), name: 'Новый Игрок', investments: 0, startScore: 0, endScore: 0, reward: '' }]);
-            const handleRemoveMember = (id) => setMembers(members.filter(m => m.id !== id));
-            const updateMember = (id, field, value) => setMembers(members.map(m => m.id === id ? { ...m, [field]: value } : m));
+        // 4. GUILD MANAGER (DB Connected)
+        const GuildManager = ({ members, dates, setDates, isAdmin }) => {
             const formatNumber = (num) => num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
             const parseNumber = (value) => { const cleaned = value.replace(/\s/g, ''); return cleaned === '' ? 0 : parseInt(cleaned, 10); };
+
+            // DB OPERATIONS (Only work if UI allows, also safeguarded via Rules in real app)
+            const addMember = async () => {
+                await addDoc(collection(db, "users"), {
+                    name: 'Новый Игрок', investments: 0, startScore: 0, endScore: 0, reward: ''
+                });
+            };
+
+            const removeMember = async (id) => {
+                if(confirm("Удалить участника?")) await deleteDoc(doc(db, "users", id));
+            };
+
+            const updateField = async (id, field, value) => {
+                await updateDoc(doc(db, "users", id), { [field]: value });
+            };
+
+            const inputClass = isAdmin 
+                ? "w-full px-2 py-1 outline-none bg-transparent text-black border-b border-transparent focus:border-blue-400" 
+                : "viewer-input w-full px-2 py-1";
+
+            const numberInputClass = isAdmin
+                ? "w-full px-2 py-1 outline-none bg-transparent font-mono text-right text-black border-b border-transparent focus:border-blue-400"
+                : "viewer-input w-full px-2 py-1 text-right";
 
             return (
                 <div className="bg-white rounded-lg shadow-lg overflow-hidden text-black">
@@ -493,7 +533,7 @@
                                     <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6">Итоговый</th>
                                     <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6 bg-blue-50 text-blue-900">Разница</th>
                                     <th className="px-4 py-2 text-left font-bold border-gray-300 w-1/6">15 - 125G</th>
-                                    <th className="w-10"></th>
+                                    {isAdmin && <th className="w-10"></th>}
                                 </tr>
                             </thead>
                             <tbody>
@@ -502,26 +542,28 @@
                                     const diffClass = difference > 0 ? 'text-green-700 font-bold' : difference < 0 ? 'text-red-700' : 'text-black';
                                     return (
                                         <tr key={member.id} className={`border-b border-gray-200 hover:bg-blue-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                                            <td className="border-r border-gray-200 p-1"><input type="text" value={member.name} onChange={(e) => updateMember(member.id, 'name', e.target.value)} className="w-full px-2 py-1 outline-none bg-transparent font-medium text-black" /></td>
-                                            <td className="border-r border-gray-200 p-1"><input type="text" value={formatNumber(member.investments)} onChange={(e) => { const val = parseNumber(e.target.value); if (!isNaN(val)) updateMember(member.id, 'investments', val); }} className="w-full px-2 py-1 outline-none bg-transparent font-mono text-right text-black" /></td>
-                                            <td className="border-r border-gray-200 p-1"><input type="number" value={member.startScore || ''} onChange={(e) => updateMember(member.id, 'startScore', parseInt(e.target.value) || 0)} className="w-full px-2 py-1 outline-none bg-transparent text-center text-black" placeholder="0" /></td>
-                                            <td className="border-r border-gray-200 p-1"><input type="number" value={member.endScore || ''} onChange={(e) => updateMember(member.id, 'endScore', parseInt(e.target.value) || 0)} className="w-full px-2 py-1 outline-none bg-transparent text-center text-black" placeholder="0" /></td>
+                                            <td className="border-r border-gray-200 p-1"><input disabled={!isAdmin} type="text" value={member.name} onChange={(e) => updateField(member.id, 'name', e.target.value)} className={inputClass} /></td>
+                                            <td className="border-r border-gray-200 p-1"><input disabled={!isAdmin} type="text" value={formatNumber(member.investments)} onChange={(e) => { const val = parseNumber(e.target.value); if (!isNaN(val)) updateField(member.id, 'investments', val); }} className={numberInputClass} /></td>
+                                            <td className="border-r border-gray-200 p-1"><input disabled={!isAdmin} type="number" value={member.startScore || ''} onChange={(e) => updateField(member.id, 'startScore', parseInt(e.target.value) || 0)} className={`${inputClass} text-center`} placeholder="0" /></td>
+                                            <td className="border-r border-gray-200 p-1"><input disabled={!isAdmin} type="number" value={member.endScore || ''} onChange={(e) => updateField(member.id, 'endScore', parseInt(e.target.value) || 0)} className={`${inputClass} text-center`} placeholder="0" /></td>
                                             <td className={`border-r border-gray-200 p-2 text-center bg-blue-50/50 ${diffClass}`}>{formatNumber(difference)}</td>
-                                            <td className="border-r border-gray-200 p-1"><input type="text" value={member.reward} onChange={(e) => updateMember(member.id, 'reward', e.target.value)} className="w-full px-2 py-1 outline-none bg-transparent text-black" placeholder="-" /></td>
-                                            <td className="p-1 text-center"><button onClick={() => handleRemoveMember(member.id)} className="text-red-500 hover:text-red-700 p-1 rounded"><IconTrash className="w-4 h-4" /></button></td>
+                                            <td className="border-r border-gray-200 p-1"><input disabled={!isAdmin} type="text" value={member.reward} onChange={(e) => updateField(member.id, 'reward', e.target.value)} className={inputClass} placeholder="-" /></td>
+                                            {isAdmin && <td className="p-1 text-center"><button onClick={() => removeMember(member.id)} className="text-red-500 hover:text-red-700 p-1 rounded"><IconTrash className="w-4 h-4" /></button></td>}
                                         </tr>
                                     );
                                 })}
-                                <tr className="bg-gray-50">
-                                    <td colSpan={7} className="p-2 text-center border-t border-gray-300"><button onClick={handleAddMember} className="flex items-center justify-center gap-2 w-full text-gray-600 hover:text-black py-2 font-medium transition-colors"><IconPlus className="w-4 h-4" /> Добавить строку</button></td>
-                                </tr>
+                                {isAdmin && (
+                                    <tr className="bg-gray-50">
+                                        <td colSpan={7} className="p-2 text-center border-t border-gray-300"><button onClick={addMember} className="flex items-center justify-center gap-2 w-full text-gray-600 hover:text-black py-2 font-medium transition-colors"><IconPlus className="w-4 h-4" /> Добавить строку (DB)</button></td>
+                                    </tr>
+                                )}
                             </tbody>
                             <tfoot className="bg-white border-t-2 border-gray-300">
                                 <tr>
                                     <td className="border-r border-gray-200"></td><td className="border-r border-gray-200"></td>
-                                    <td className="border-r border-gray-200 p-2"><input type="text" value={dates.start} onChange={(e) => setDates({...dates, start: e.target.value})} className="w-full text-center italic text-black text-xs outline-none border-b border-transparent focus:border-blue-400" /></td>
-                                    <td className="border-r border-gray-200 p-2"><input type="text" value={dates.end} onChange={(e) => setDates({...dates, end: e.target.value})} className="w-full text-center italic text-black text-xs outline-none border-b border-transparent focus:border-blue-400" /></td>
-                                    <td colSpan={3}></td>
+                                    <td className="border-r border-gray-200 p-2"><input disabled={!isAdmin} type="text" value={dates.start} onChange={(e) => setDates({...dates, start: e.target.value})} className="w-full text-center italic text-black text-xs outline-none border-b border-transparent focus:border-blue-400 bg-transparent" /></td>
+                                    <td className="border-r border-gray-200 p-2"><input disabled={!isAdmin} type="text" value={dates.end} onChange={(e) => setDates({...dates, end: e.target.value})} className="w-full text-center italic text-black text-xs outline-none border-b border-transparent focus:border-blue-400 bg-transparent" /></td>
+                                    <td colSpan={isAdmin ? 3 : 2}></td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -531,7 +573,7 @@
         };
 
         // 5. LOTTERY SYSTEM
-        const LotterySystem = ({ members }) => {
+        const LotterySystem = ({ members, history, isAdmin }) => {
             const parseLimit = (value) => { if (!value) return 0; const numbers = value.replace(/\D/g, ''); return numbers ? parseInt(numbers, 10) : 0; };
             const participants = members.map(m => ({ id: m.id, name: m.name, score: parseLimit(m.reward) })).filter(p => p.score > 0);
 
@@ -540,23 +582,77 @@
                     <div className="mb-8 bg-blue-900/20 border border-blue-500/20 p-4 rounded-lg">
                         <p className="text-sm text-blue-200">ℹ️ <strong>Правила участия:</strong> Колонка <strong>"15 - 125G"</strong> — максимальный уровень допуска.</p>
                     </div>
-                    <ContestManager allParticipants={participants} />
+                    <ContestManager allParticipants={participants} history={history} isAdmin={isAdmin} />
                 </div>
             );
         };
 
-        // 6. APP
+        // 6. MAIN APP
         const App = () => {
             const [activeTab, setActiveTab] = useState('members');
-            const [members, setMembers] = useState(INITIAL_MEMBERS);
+            const [members, setMembers] = useState([]);
+            const [history, setHistory] = useState([]);
+            const [loading, setLoading] = useState(true);
             const [aiAnalysis, setAiAnalysis] = useState('');
             const [dates, setDates] = useState({ start: '15.11.2025', end: '01.01.2026' });
+            
+            // ADMIN STATE
+            const [isAdmin, setIsAdmin] = useState(false);
+
+            // LOAD ADMIN STATE
+            useEffect(() => {
+                const storedAdmin = localStorage.getItem('gm_admin');
+                if (storedAdmin === 'true') setIsAdmin(true);
+            }, []);
+
+            const toggleAdmin = () => {
+                if (isAdmin) {
+                    setIsAdmin(false);
+                    localStorage.removeItem('gm_admin');
+                } else {
+                    const pass = prompt("Введите пароль ГМ:");
+                    if (pass === "GM123") {
+                        setIsAdmin(true);
+                        localStorage.setItem('gm_admin', 'true');
+                    } else if (pass) {
+                        alert("Неверный пароль");
+                    }
+                }
+            };
+
+            // SUBSCIBE TO USERS
+            useEffect(() => {
+                const q = query(collection(db, "users"));
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const loadedMembers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    // Simple local sort by name or id could be added here
+                    setMembers(loadedMembers);
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // SUBSCRIBE TO HISTORY
+            useEffect(() => {
+                const q = query(collection(db, "history"), orderBy("timestamp", "desc"));
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const loadedHistory = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setHistory(loadedHistory);
+                });
+                return () => unsubscribe();
+            }, []);
 
             const handleAnalyze = () => {
-                // Use local math logic
                 const result = analyzeLocally(members);
                 setAiAnalysis(result);
             };
+
+            if (loading) {
+                return <div className="min-h-screen bg-guild-900 flex items-center justify-center flex-col gap-4">
+                    <div className="loader"></div>
+                    <div className="text-gray-400">Связь с сервером Firebase...</div>
+                </div>;
+            }
 
             return (
                 <div className="min-h-screen bg-guild-900 text-gray-100 font-sans pb-12">
@@ -565,17 +661,25 @@
                             <div className="flex items-center gap-2">
                                 <div className="bg-guild-accent p-2 rounded-lg"><IconShield className="w-6 h-6 text-white" /></div>
                                 <h1 className="text-xl font-bold tracking-wide text-white">Guild<span className="text-guild-accent">Master</span></h1>
+                                <span className="text-xs px-2 py-0.5 rounded bg-green-900 text-green-400 border border-green-700 ml-2 flex items-center gap-1"><IconCloud className="w-3 h-3" /> Online</span>
                             </div>
-                            <nav className="flex gap-1 md:gap-4">
+                            <nav className="flex items-center gap-1 md:gap-4">
                                 <button onClick={() => setActiveTab('members')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'members' ? 'bg-guild-700 text-white shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-guild-800'}`}><IconUsers className="w-4 h-4" /><span className="hidden md:inline">Таблица</span></button>
                                 <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'stats' ? 'bg-guild-700 text-white shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-guild-800'}`}><IconChart className="w-4 h-4" /><span className="hidden md:inline">Статистика</span></button>
                                 <button onClick={() => setActiveTab('lottery')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'lottery' ? 'bg-guild-700 text-white shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-guild-800'}`}><IconDices className="w-4 h-4" /><span className="hidden md:inline">Розыгрыш</span></button>
+                                
+                                {/* ADMIN TOGGLE */}
+                                <div className="ml-4 border-l border-guild-700 pl-4">
+                                    <button onClick={toggleAdmin} className={`p-2 rounded-full hover:bg-guild-700 transition-colors ${isAdmin ? 'text-green-400' : 'text-gray-500'}`}>
+                                        {isAdmin ? <IconUnlock className="w-5 h-5" /> : <IconLock className="w-5 h-5" />}
+                                    </button>
+                                </div>
                             </nav>
                         </div>
                     </header>
                     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                         <div className="animate-fade-in">
-                            {activeTab === 'members' && <div className="space-y-6"><GuildManager members={members} setMembers={setMembers} dates={dates} setDates={setDates} /></div>}
+                            {activeTab === 'members' && <div className="space-y-6"><GuildManager members={members} dates={dates} setDates={setDates} isAdmin={isAdmin} /></div>}
                             {activeTab === 'stats' && (
                                 <div className="space-y-8">
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -593,8 +697,11 @@
                             )}
                             {activeTab === 'lottery' && (
                                 <div className="space-y-6">
-                                    <div className="mb-4"><h2 className="text-2xl font-bold text-white">Великий Рандом</h2></div>
-                                    <LotterySystem members={members} />
+                                    <div className="mb-4 flex justify-between items-center">
+                                        <h2 className="text-2xl font-bold text-white">Великий Рандом</h2>
+                                        {!isAdmin && <span className="text-xs bg-blue-900 text-blue-200 px-2 py-1 rounded border border-blue-700">Режим Зрителя</span>}
+                                    </div>
+                                    <LotterySystem members={members} history={history} isAdmin={isAdmin} />
                                 </div>
                             )}
                         </div>
