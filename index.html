@@ -84,26 +84,26 @@
 
         // --- CONSTANTS ---
         const DEMO_DATA = [
-            { id: '1', name: "Фасоль#51817", base: 150818174500, final: null },
-            { id: '2', name: "Мяу#97418", base: 723767374500, final: null },
-            { id: '3', name: "dimandorf#98147", base: 347739374500, final: null },
-            { id: '4', name: "Nezhdanchick#90542", base: 121985674500, final: null },
-            { id: '5', name: "Дэментор#5030", base: 375947374500, final: null },
-            { id: '6', name: "Adanei#72323", base: 60665339100, final: null },
-            { id: '7', name: "Асула#92795", base: 241222674500, final: null },
-            { id: '8', name: "Shadow#24330", base: 97337374500, final: null },
-            { id: '9', name: "selfaa#67769", base: 243840424500, final: null },
-            { id: '10', name: "Mihaqlovich#89594", base: 500117374500, final: null },
-            { id: '11', name: "Zarya#88899", base: 641617374500, final: null },
-            { id: '12', name: "INKI#33936", base: 358867374500, final: null },
-            { id: '13', name: "Rainer#73242", base: 462659374500, final: null },
-            { id: '14', name: "Алена#20153", base: 284313374500, final: null },
-            { id: '15', name: "Алекс#46688", base: 920007374500, final: null },
-            { id: '16', name: "Калямбус#3224", base: 88030874500, final: null },
-            { id: '17', name: "Aver1n#93710", base: 125861370700, final: null },
-            { id: '18', name: "Сатана#38064", base: 307767374500, final: null },
-            { id: '19', name: "Nipi#58068", base: 163467488400, final: null },
-            { id: '20', name: "YuryQ#38320", base: 617395374500, final: null }
+            { id: '1', name: "Фасоль#51817", base: 150818174500, final: null, intermediate: null },
+            { id: '2', name: "Мяу#97418", base: 723767374500, final: null, intermediate: null },
+            { id: '3', name: "dimandorf#98147", base: 347739374500, final: null, intermediate: null },
+            { id: '4', name: "Nezhdanchick#90542", base: 121985674500, final: null, intermediate: null },
+            { id: '5', name: "Дэментор#5030", base: 375947374500, final: null, intermediate: null },
+            { id: '6', name: "Adanei#72323", base: 60665339100, final: null, intermediate: null },
+            { id: '7', name: "Асула#92795", base: 241222674500, final: null, intermediate: null },
+            { id: '8', name: "Shadow#24330", base: 97337374500, final: null, intermediate: null },
+            { id: '9', name: "selfaa#67769", base: 243840424500, final: null, intermediate: null },
+            { id: '10', name: "Mihaqlovich#89594", base: 500117374500, final: null, intermediate: null },
+            { id: '11', name: "Zarya#88899", base: 641617374500, final: null, intermediate: null },
+            { id: '12', name: "INKI#33936", base: 358867374500, final: null, intermediate: null },
+            { id: '13', name: "Rainer#73242", base: 462659374500, final: null, intermediate: null },
+            { id: '14', name: "Алена#20153", base: 284313374500, final: null, intermediate: null },
+            { id: '15', name: "Алекс#46688", base: 920007374500, final: null, intermediate: null },
+            { id: '16', name: "Калямбус#3224", base: 88030874500, final: null, intermediate: null },
+            { id: '17', name: "Aver1n#93710", base: 125861370700, final: null, intermediate: null },
+            { id: '18', name: "Сатана#38064", base: 307767374500, final: null, intermediate: null },
+            { id: '19', name: "Nipi#58068", base: 163467488400, final: null, intermediate: null },
+            { id: '20', name: "YuryQ#38320", base: 617395374500, final: null, intermediate: null }
         ];
 
         const TIERS = [15, 25, 50, 75, 100, 125];
@@ -113,7 +113,7 @@
         // --- UTILS ---
         const fmt = (n) => new Intl.NumberFormat('ru-RU').format(n);
         const getDiff = (m) => {
-            const cur = m.final !== null ? m.final : (m.intermediate !== null ? m.intermediate : m.base);
+            const cur = m.final !== null && m.final !== undefined ? m.final : (m.intermediate !== null && m.intermediate !== undefined ? m.intermediate : m.base);
             const diff = cur - m.base;
             return diff < 0 ? 0 : diff;
         };
@@ -130,7 +130,7 @@
                 setInterval(tick, 1000);
             }, []);
             return (
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-50">
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-30 pointer-events-none select-none">
                     <div className="text-3xl font-black text-amber-500 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-mono">
                         {time}
                     </div>
@@ -140,17 +140,25 @@
         };
 
         // --- COMPONENT: EXCEL TABLE ---
-        const ExcelTable = ({ members, isAdmin }) => {
+        const ExcelTable = ({ members, isAdmin, fullData }) => {
+            
+            // Function to handle updates. Uses setDoc with merge:true to create doc if missing (hybrid demo mode)
             const updateField = async (id, field, value) => {
                 if (!isAdmin) return;
                 const num = value === '' ? null : Number(value.replace(/\s/g, ''));
                 if (isNaN(num)) return;
                 
+                // Find current data in local state to ensure we save the full object if it's new
+                const currentMember = fullData.find(m => m.id === id);
+                
                 const userRef = doc(db, "users", id);
-                await updateDoc(userRef, { [field]: num });
+                await setDoc(userRef, { 
+                    ...currentMember, 
+                    [field]: num 
+                }, { merge: true });
             };
 
-            const uploadDemo = async () => {
+            const forceUpload = async () => {
                 if (!confirm("Это перезапишет базу данных. Продолжить?")) return;
                 for (const u of DEMO_DATA) {
                     await setDoc(doc(db, "users", u.id), u);
@@ -161,9 +169,9 @@
                 <div className="bg-white rounded-lg shadow-xl overflow-hidden text-slate-900 border border-slate-300">
                     <div className="p-4 bg-slate-100 border-b flex justify-between items-center">
                         <h2 className="font-bold text-lg text-slate-700 uppercase tracking-wider">Таблица Вкладов</h2>
-                        {isAdmin && members.length === 0 && (
-                            <button onClick={uploadDemo} className="flex items-center gap-2 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
-                                <Upload size={12} /> Загрузить Демо
+                        {isAdmin && (
+                            <button onClick={forceUpload} className="flex items-center gap-2 text-xs bg-slate-200 text-slate-600 px-3 py-1 rounded hover:bg-slate-300">
+                                <Upload size={12} /> Сброс Данных
                             </button>
                         )}
                     </div>
@@ -192,7 +200,7 @@
                                             <td className="border p-0 bg-white">
                                                 <input className="excel-input p-2"
                                                     disabled={!isAdmin}
-                                                    defaultValue={m.intermediate !== null ? fmt(m.intermediate) : ''}
+                                                    defaultValue={m.intermediate !== null && m.intermediate !== undefined ? fmt(m.intermediate) : ''}
                                                     onBlur={(e) => updateField(m.id, 'intermediate', e.target.value)}
                                                     placeholder={isAdmin ? "-" : ""}
                                                 />
@@ -200,7 +208,7 @@
                                             <td className="border p-0 bg-pink-50">
                                                 <input className="excel-input p-2 font-bold text-slate-900"
                                                     disabled={!isAdmin}
-                                                    defaultValue={m.final !== null ? fmt(m.final) : ''}
+                                                    defaultValue={m.final !== null && m.final !== undefined ? fmt(m.final) : ''}
                                                     onBlur={(e) => updateField(m.id, 'final', e.target.value)}
                                                     placeholder={isAdmin ? "-" : ""}
                                                 />
@@ -520,16 +528,20 @@
 
         // --- MAIN APP ---
         const App = () => {
-            const [members, setMembers] = useState([]);
+            // INITIALIZE WITH DEMO DATA SO IT'S NOT EMPTY INITIALLY
+            const [members, setMembers] = useState(DEMO_DATA);
             const [tab, setTab] = useState('table');
             const [isAdmin, setIsAdmin] = useState(localStorage.getItem('isAdmin') === 'true');
 
             // Sync Users
             useEffect(() => {
-                const q = query(collection(db, "users"), orderBy("base", "desc")); // Order by Base contribution
+                const q = query(collection(db, "users"), orderBy("base", "desc"));
                 const unsub = onSnapshot(q, (snap) => {
-                    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    setMembers(data);
+                    // If DB has data, use it. If not, keep local DEMO_DATA (hybrid mode)
+                    if (!snap.empty) {
+                        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        setMembers(data);
+                    }
                 });
                 return () => unsub();
             }, []);
@@ -554,7 +566,7 @@
                     {/* Header */}
                     <header className="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-40 shadow-lg">
                         <div className="max-w-6xl mx-auto flex justify-between items-center relative">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 z-50 relative">
                                 <div className="bg-amber-500/20 p-2 rounded-lg">
                                     <Trophy className="text-amber-500" size={24} />
                                 </div>
@@ -566,7 +578,7 @@
 
                             <MoscowClock />
 
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 z-50 relative">
                                 <button onClick={toggleAdmin} className={`p-2 rounded-full transition ${isAdmin ? 'bg-red-500/20 text-red-500' : 'bg-slate-800 text-slate-500 hover:text-slate-300'}`}>
                                     {isAdmin ? <Unlock size={20} /> : <Lock size={20} />}
                                 </button>
@@ -591,7 +603,7 @@
 
                     {/* Content */}
                     <main className="max-w-6xl mx-auto mt-8 px-4">
-                        {tab === 'table' && <ExcelTable members={members} isAdmin={isAdmin} />}
+                        {tab === 'table' && <ExcelTable members={members} isAdmin={isAdmin} fullData={members} />}
                         {tab === 'lottery' && <Roulette members={members} isAdmin={isAdmin} />}
                         {tab === 'archive' && <ArchiveView />}
                     </main>
