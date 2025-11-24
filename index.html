@@ -287,7 +287,7 @@
             );
         };
 
-        // --- COMPONENT: VERTICAL SLOT ROULETTE (EQUAL CHANCE) ---
+        // --- COMPONENT: VERTICAL SLOT ROULETTE (STRICT EQUAL CHANCE) ---
         const VerticalRoulette = ({ members, isAdmin }) => {
             const [currentTierIdx, setCurrentTierIdx] = useState(0);
             const [currentWinCount, setCurrentWinCount] = useState(0);
@@ -307,6 +307,7 @@
             const CARD_HEIGHT = 100;
             const WIN_INDEX = 40; 
 
+            // Filter eligible members
             const eligible = members.filter(m => getTierG(getDiff(m)) >= currentTier);
 
             useEffect(() => {
@@ -324,18 +325,21 @@
                 setIsSpinning(true);
                 setWinner(null);
 
-                // EQUAL CHANCE LOGIC: Simple random
+                // EQUAL CHANCE LOGIC: PURE RANDOM
+                // No weighing by amount. 
                 const winnerIndex = Math.floor(Math.random() * eligible.length);
                 const selected = eligible[winnerIndex];
                 setWinner(selected);
 
                 // Build Tape
+                // Populate the tape randomly to reinforce the visual idea of randomness
                 const tapeLength = 60;
                 const newTape = [];
                 for(let i=0; i < tapeLength; i++) {
                     if (i === WIN_INDEX) {
                         newTape.push(selected);
                     } else {
+                        // Random pick for other slots
                         newTape.push(eligible[Math.floor(Math.random() * eligible.length)]);
                     }
                 }
@@ -402,8 +406,11 @@
                 navigator.clipboard.writeText(txt).then(() => alert("Скопировано!"));
             };
 
-            const sortedEligible = [...eligible]; // No sorting needed for equal chance really, but looks cleaner if consistent
-            const winChance = eligible.length > 0 ? (100 / eligible.length).toFixed(2) : 0;
+            // SORT ALPHABETICALLY TO SHOW EQUALITY
+            const sortedEligible = [...eligible].sort((a,b) => a.name.localeCompare(b.name));
+            
+            // UNIFORM CHANCE
+            const winChance = eligible.length > 0 ? (100 / eligible.length).toFixed(2) : "0.00";
 
             return (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -511,15 +518,13 @@
                             {sortedEligible.map((m, i) => (
                                 <div key={m.id} className="bg-slate-900/40 p-2 rounded border border-slate-700/50 hover:border-amber-500/30 transition">
                                     <div className="flex justify-between items-center mb-1">
-                                        <div className="font-bold text-xs text-slate-300 truncate w-24">{m.name.split('#')[0]}</div>
+                                        <div className="font-bold text-xs text-slate-300 truncate w-32">{m.name.split('#')[0]}</div>
                                         <div className="text-right">
-                                            <div className="text-amber-500 font-mono text-xs font-bold">{fmt(getTierG(getDiff(m)))}G</div>
+                                            <div className="text-slate-500 font-mono text-[10px] uppercase">ШАНС</div>
+                                            <div className="text-amber-500 font-bold text-sm">{winChance}%</div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-between text-[10px] text-slate-500">
-                                        <span>Шанс:</span>
-                                        <span className="font-bold text-amber-500/80">{winChance}%</span>
-                                    </div>
+                                    {/* Removed progress bar as requested for clarity */}
                                 </div>
                             ))}
                         </div>
