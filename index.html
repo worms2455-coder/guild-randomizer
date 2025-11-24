@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guild Ionia - Equal Chance Roulette</title>
+    <title>Guild Ionia - Audit Log System</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -37,15 +37,6 @@
                     fontFamily: {
                         mono: ['Consolas', 'Monaco', 'Courier New', 'monospace'],
                     },
-                    animation: {
-                        'pulse-gold': 'pulse-gold 2s infinite',
-                    },
-                    keyframes: {
-                        'pulse-gold': {
-                            '0%, 100%': { boxShadow: '0 0 0 0 rgba(245, 158, 11, 0.4)' },
-                            '50%': { boxShadow: '0 0 0 10px rgba(245, 158, 11, 0)' },
-                        }
-                    }
                 }
             }
         }
@@ -69,11 +60,11 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { Lock, Unlock, Trophy, Archive, Table as TableIcon, Upload, Save, Copy, X, Calendar, ChevronDown, ChevronUp, Trash2, UserPlus } from 'lucide-react';
+        import { Lock, Unlock, Trophy, Archive, Table as TableIcon, Upload, Save, Copy, X, Calendar, ChevronDown, ChevronUp, Trash2, UserPlus, Eye, ShieldAlert, History } from 'lucide-react';
         
         // --- FIREBASE CONFIGURATION ---
         import { initializeApp } from "firebase/app";
-        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, query, orderBy } from "firebase/firestore";
+        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, query, orderBy, limit } from "firebase/firestore";
 
         const firebaseConfig = {
           apiKey: "AIzaSyCIFKGZioiflKAAA1tHkIZV0u1sMiPzUjo",
@@ -152,10 +143,51 @@
             );
         };
 
+        // --- COMPONENT: LOGS VIEW ---
+        const LogsView = ({ logs }) => {
+            if (!logs || logs.length === 0) {
+                return <div className="p-10 text-center text-slate-500">Журнал действий пуст</div>;
+            }
+
+            return (
+                <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-xl">
+                    <div className="p-4 bg-slate-900 border-b border-slate-700 flex items-center gap-2">
+                         <History className="text-amber-500" size={20} />
+                         <h3 className="font-bold text-slate-200 uppercase tracking-wide">Журнал Аудита (Последние 50)</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-slate-400 uppercase bg-slate-900/50">
+                                <tr>
+                                    <th className="px-4 py-3">Время (МСК)</th>
+                                    <th className="px-4 py-3">Роль</th>
+                                    <th className="px-4 py-3">Действие</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-700 font-mono">
+                                {logs.map((log) => {
+                                    const date = new Date(log.timestamp);
+                                    const timeStr = date.toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" });
+                                    const roleColor = log.role === 'ADMIN' ? 'text-red-400' : 'text-blue-400';
+                                    
+                                    return (
+                                        <tr key={log.id} className="bg-slate-800 hover:bg-slate-750">
+                                            <td className="px-4 py-2 text-slate-500 whitespace-nowrap">{timeStr}</td>
+                                            <td className={`px-4 py-2 font-bold ${roleColor}`}>{log.role}</td>
+                                            <td className="px-4 py-2 text-slate-300">{log.text}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
         // --- COMPONENT: ARCHIVE VIEW ---
         const ArchiveView = ({ archives }) => {
             const [expandedId, setExpandedId] = useState(null);
-
             const toggle = (id) => setExpandedId(expandedId === id ? null : id);
 
             if (archives.length === 0) {
@@ -202,50 +234,55 @@
         };
 
         // --- COMPONENT: EXCEL TABLE ---
-        const ExcelTable = ({ members, isAdmin, fullData }) => {
+        const ExcelTable = ({ members, role, fullData, logAction }) => {
+            const isEditable = role === 'ADMIN' || role === 'TESTER';
+
             const updateField = async (id, field, value) => {
-                if (!isAdmin) return;
+                if (!isEditable) return;
                 const num = value === '' ? null : Number(value.replace(/\s/g, ''));
                 if (isNaN(num)) return;
                 
                 const currentMember = fullData.find(m => m.id === id);
+                const oldVal = currentMember[field];
+                
                 await setDoc(doc(db, "users", id), { ...currentMember, [field]: num }, { merge: true });
+                
+                // Audit Log
+                if (oldVal !== num) {
+                    await logAction(`Изменил ${currentMember.name}: ${field === 'final' ? 'Итог' : 'Промеж.'} ${fmt(oldVal || 0)} -> ${fmt(num)}`);
+                }
             };
 
             const forceUpload = async () => {
+                if (!isEditable) return;
                 if (!confirm("ВНИМАНИЕ: Это перезапишет базу данных демо-данными. Продолжить?")) return;
                 for (const u of DEMO_DATA) {
                     await setDoc(doc(db, "users", u.id), u);
                 }
+                await logAction("Восстановил Демо-данные");
             };
 
             const addMember = async () => {
-                if (!isAdmin) return;
+                if (!isEditable) return;
                 const name = prompt("Введите Никнейм нового участника:");
                 if (!name) return;
                 const baseStr = prompt("Введите Базовое вложение (число):", "0");
                 const base = Number(baseStr.replace(/\s/g, ''));
                 if (isNaN(base)) { alert("Неверное число"); return; }
 
-                // Find max ID to prevent collision
                 const maxId = fullData.reduce((max, curr) => Math.max(max, Number(curr.id) || 0), 0);
                 const newId = String(maxId + 1);
 
-                const newMember = {
-                    id: newId,
-                    name: name,
-                    base: base,
-                    intermediate: null,
-                    final: null
-                };
-
+                const newMember = { id: newId, name: name, base: base, intermediate: null, final: null };
                 await setDoc(doc(db, "users", newId), newMember);
+                await logAction(`Добавил участника: ${name}`);
             };
 
-            const removeMember = async (id) => {
-                if (!isAdmin) return;
-                if (confirm("Вы уверены, что хотите удалить этого участника?")) {
-                    await deleteDoc(doc(db, "users", id));
+            const removeMember = async (m) => {
+                if (!isEditable) return;
+                if (confirm(`Вы уверены, что хотите удалить ${m.name}?`)) {
+                    await deleteDoc(doc(db, "users", m.id));
+                    await logAction(`Удалил участника: ${m.name}`);
                 }
             };
 
@@ -254,13 +291,13 @@
                     <div className="p-4 bg-slate-100 border-b flex justify-between items-center">
                         <div className="flex items-center gap-4">
                             <h2 className="font-bold text-lg text-slate-700 uppercase tracking-wider">Таблица Вкладов</h2>
-                            {isAdmin && (
+                            {isEditable && (
                                 <button onClick={addMember} className="flex items-center gap-1 text-xs bg-green-100 text-green-700 border border-green-200 px-3 py-1 rounded hover:bg-green-200 font-bold">
                                     <UserPlus size={14} /> Добавить
                                 </button>
                             )}
                         </div>
-                        {isAdmin && (
+                        {isEditable && (
                             <button onClick={forceUpload} className="flex items-center gap-2 text-xs bg-slate-200 text-slate-600 px-3 py-1 rounded hover:bg-slate-300">
                                 <Upload size={12} /> Загрузить Демо
                             </button>
@@ -277,7 +314,7 @@
                                     <th className="border p-2 text-right bg-pink-100 text-pink-700">Итоговый</th>
                                     <th className="border p-2 text-right bg-blue-100 text-blue-700">Разница</th>
                                     <th className="border p-2 text-left w-48">Тиры</th>
-                                    {isAdmin && <th className="border p-2 w-10 text-center"></th>}
+                                    {isEditable && <th className="border p-2 w-10 text-center"></th>}
                                 </tr>
                             </thead>
                             <tbody className="font-mono text-slate-800">
@@ -291,18 +328,18 @@
                                             <td className="border p-2 text-right text-slate-500">{fmt(m.base)}</td>
                                             <td className="border p-0 bg-white">
                                                 <input className="excel-input p-2"
-                                                    disabled={!isAdmin}
+                                                    disabled={!isEditable}
                                                     defaultValue={m.intermediate !== null && m.intermediate !== undefined ? fmt(m.intermediate) : ''}
                                                     onBlur={(e) => updateField(m.id, 'intermediate', e.target.value)}
-                                                    placeholder={isAdmin ? "-" : ""}
+                                                    placeholder={isEditable ? "-" : ""}
                                                 />
                                             </td>
                                             <td className="border p-0 bg-pink-50">
                                                 <input className="excel-input p-2 font-bold text-slate-900"
-                                                    disabled={!isAdmin}
+                                                    disabled={!isEditable}
                                                     defaultValue={m.final !== null && m.final !== undefined ? fmt(m.final) : ''}
                                                     onBlur={(e) => updateField(m.id, 'final', e.target.value)}
-                                                    placeholder={isAdmin ? "-" : ""}
+                                                    placeholder={isEditable ? "-" : ""}
                                                 />
                                             </td>
                                             <td className="border p-2 text-right font-bold bg-blue-50 text-blue-800">
@@ -315,9 +352,9 @@
                                                     ))}
                                                 </div>
                                             </td>
-                                            {isAdmin && (
+                                            {isEditable && (
                                                 <td className="border p-2 text-center">
-                                                    <button onClick={() => removeMember(m.id)} className="text-red-400 hover:text-red-600 transition">
+                                                    <button onClick={() => removeMember(m)} className="text-red-400 hover:text-red-600 transition">
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </td>
@@ -332,8 +369,9 @@
             );
         };
 
-        // --- COMPONENT: VERTICAL SLOT ROULETTE (STRICT EQUAL CHANCE) ---
-        const VerticalRoulette = ({ members, isAdmin }) => {
+        // --- COMPONENT: VERTICAL SLOT ROULETTE ---
+        const VerticalRoulette = ({ members, role, logAction }) => {
+            const isControl = role === 'ADMIN' || role === 'TESTER';
             const [currentTierIdx, setCurrentTierIdx] = useState(0);
             const [currentWinCount, setCurrentWinCount] = useState(0);
             const [sessionResults, setSessionResults] = useState([]);
@@ -352,7 +390,6 @@
             const CARD_HEIGHT = 100;
             const WIN_INDEX = 40; 
 
-            // Filter eligible members
             const eligible = members.filter(m => getTierG(getDiff(m)) >= currentTier);
 
             useEffect(() => {
@@ -364,37 +401,33 @@
                 }
             }, [eligible.length, currentTier, isSpinning]);
 
-            const spin = () => {
+            const spin = async () => {
                 if(isSpinning || eligible.length === 0 || isFinished) return;
                 
                 setIsSpinning(true);
                 setWinner(null);
+                
+                await logAction(`Запустил рулетку Тир ${currentTier}G`);
 
-                // EQUAL CHANCE LOGIC: PURE RANDOM
-                // No weighing by amount. 
                 const winnerIndex = Math.floor(Math.random() * eligible.length);
                 const selected = eligible[winnerIndex];
                 setWinner(selected);
 
-                // Build Tape
-                // Populate the tape randomly to reinforce the visual idea of randomness
                 const tapeLength = 60;
                 const newTape = [];
                 for(let i=0; i < tapeLength; i++) {
                     if (i === WIN_INDEX) {
                         newTape.push(selected);
                     } else {
-                        // Random pick for other slots
                         newTape.push(eligible[Math.floor(Math.random() * eligible.length)]);
                     }
                 }
                 setTape(newTape);
 
-                // Animation
                 if(listRef.current) {
                     listRef.current.style.transition = 'none';
                     listRef.current.style.transform = 'translateY(0px)';
-                    listRef.current.offsetHeight; // force reflow
+                    listRef.current.offsetHeight; 
 
                     const centerContainer = CONTAINER_HEIGHT / 2;
                     const centerWinner = (WIN_INDEX * CARD_HEIGHT) + (CARD_HEIGHT / 2);
@@ -408,7 +441,6 @@
                     }, 50);
                 }
 
-                // Cleanup
                 setTimeout(() => {
                     setIsSpinning(false);
                     const result = {
@@ -439,6 +471,7 @@
                     timestamp: Date.now(),
                     results: sessionResults
                 });
+                await logAction(`Сохранил сессию в архив: ${sessionResults.length} победителей`);
                 alert("Сессия сохранена в Архив!");
                 setShowModal(false);
             };
@@ -451,10 +484,7 @@
                 navigator.clipboard.writeText(txt).then(() => alert("Скопировано!"));
             };
 
-            // SORT ALPHABETICALLY TO SHOW EQUALITY
             const sortedEligible = [...eligible].sort((a,b) => a.name.localeCompare(b.name));
-            
-            // UNIFORM CHANCE
             const winChance = eligible.length > 0 ? (100 / eligible.length).toFixed(2) : "0.00";
 
             return (
@@ -519,7 +549,7 @@
                                 </div>
                             )}
                             
-                            {isAdmin ? (
+                            {isControl ? (
                                 <button onClick={spin} disabled={isSpinning || isFinished || eligible.length === 0}
                                     className="w-full py-5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-900 font-black text-2xl uppercase tracking-[0.2em] rounded-xl shadow-[0_0_30px_rgba(245,158,11,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition transform active:scale-95">
                                     {isSpinning ? 'ВРАЩЕНИЕ...' : isFinished ? 'СЕССИЯ ЗАВЕРШЕНА' : eligible.length === 0 ? 'НЕТ УЧАСТНИКОВ' : 'ЗАПУСТИТЬ РАУНД'}
@@ -608,10 +638,11 @@
 
         // --- MAIN APP ---
         const App = () => {
-            const [isAdmin, setIsAdmin] = useState(false);
+            const [role, setRole] = useState('GUEST'); // GUEST, ADMIN, TESTER
             const [activeTab, setActiveTab] = useState('table');
             const [members, setMembers] = useState(DEMO_DATA); 
             const [archives, setArchives] = useState([]);
+            const [logs, setLogs] = useState([]);
 
             // Sync Users
             useEffect(() => {
@@ -619,7 +650,6 @@
                 const unsub = onSnapshot(q, (snapshot) => {
                     if(!snapshot.empty) {
                         const data = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                        // Simple Sort by ID if numeric strings
                         data.sort((a,b) => Number(a.id) - Number(b.id));
                         setMembers(data);
                     }
@@ -636,31 +666,56 @@
                 });
                 return () => unsub();
             }, []);
+            
+            // Sync Logs
+            useEffect(() => {
+                if(role === 'ADMIN' || role === 'TESTER') {
+                    const q = query(collection(db, "logs"), orderBy("timestamp", "desc"), limit(50));
+                    const unsub = onSnapshot(q, (snapshot) => {
+                         const data = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                         setLogs(data);
+                    });
+                    return () => unsub();
+                }
+            }, [role]);
 
             useEffect(() => {
-                const saved = localStorage.getItem('guild_admin');
-                if(saved === 'true') setIsAdmin(true);
+                const saved = localStorage.getItem('guild_role');
+                if(saved) setRole(saved);
             }, []);
 
-            const toggleAdmin = () => {
-                if(isAdmin) {
-                    setIsAdmin(false);
-                    localStorage.removeItem('guild_admin');
+            const toggleAuth = () => {
+                if(role !== 'GUEST') {
+                    setRole('GUEST');
+                    localStorage.removeItem('guild_role');
+                    setActiveTab('table');
                 } else {
-                    const pwd = prompt("Введите пароль Администратора:");
+                    const pwd = prompt("Введите пароль (ADMIN или TESTER):");
                     if(pwd === "GM123") {
-                        setIsAdmin(true);
-                        localStorage.setItem('guild_admin', 'true');
+                        setRole('ADMIN');
+                        localStorage.setItem('guild_role', 'ADMIN');
+                    } else if (pwd === "TEST1234") {
+                         setRole('TESTER');
+                         localStorage.setItem('guild_role', 'TESTER');
                     }
                 }
+            };
+            
+            const logAction = async (text) => {
+                 await addDoc(collection(db, "logs"), {
+                     text,
+                     role,
+                     timestamp: Date.now()
+                 });
             };
 
             return (
                 <div className="min-h-screen pb-10">
                     <MoscowClock />
                     
-                    <button onClick={toggleAdmin} className="fixed top-4 right-4 z-50 text-slate-500 hover:text-amber-500 transition bg-slate-900/50 p-2 rounded-full pointer-events-auto">
-                        {isAdmin ? <Unlock size={20} /> : <Lock size={20} />}
+                    <button onClick={toggleAuth} className="fixed top-4 right-4 z-50 text-slate-500 hover:text-amber-500 transition bg-slate-900/50 p-2 rounded-full pointer-events-auto flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase">{role}</span>
+                        {role !== 'GUEST' ? <Unlock size={20} /> : <Lock size={20} />}
                     </button>
 
                     <div className="max-w-[1400px] mx-auto pt-24 px-4">
@@ -675,12 +730,18 @@
                                 <button onClick={() => setActiveTab('archive')} className={`px-6 py-2 rounded-full text-sm font-bold transition ${activeTab === 'archive' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}>
                                     Архив
                                 </button>
+                                {(role === 'ADMIN' || role === 'TESTER') && (
+                                    <button onClick={() => setActiveTab('logs')} className={`px-6 py-2 rounded-full text-sm font-bold transition flex items-center gap-1 ${activeTab === 'logs' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}>
+                                        <Eye size={14} /> Журнал
+                                    </button>
+                                )}
                             </div>
                         </div>
 
-                        {activeTab === 'table' && <ExcelTable members={members} isAdmin={isAdmin} fullData={members} />}
-                        {activeTab === 'lottery' && <VerticalRoulette members={members} isAdmin={isAdmin} />}
+                        {activeTab === 'table' && <ExcelTable members={members} role={role} fullData={members} logAction={logAction} />}
+                        {activeTab === 'lottery' && <VerticalRoulette members={members} role={role} logAction={logAction} />}
                         {activeTab === 'archive' && <ArchiveView archives={archives} />}
+                        {activeTab === 'logs' && (role === 'ADMIN' || role === 'TESTER') && <LogsView logs={logs} />}
                     </div>
                 </div>
             );
