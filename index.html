@@ -69,11 +69,11 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { Lock, Unlock, Trophy, Archive, Table as TableIcon, Upload, Save, Copy, X, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+        import { Lock, Unlock, Trophy, Archive, Table as TableIcon, Upload, Save, Copy, X, Calendar, ChevronDown, ChevronUp, Trash2, UserPlus } from 'lucide-react';
         
         // --- FIREBASE CONFIGURATION ---
         import { initializeApp } from "firebase/app";
-        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, query, orderBy } from "firebase/firestore";
+        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, query, orderBy } from "firebase/firestore";
 
         const firebaseConfig = {
           apiKey: "AIzaSyCIFKGZioiflKAAA1tHkIZV0u1sMiPzUjo",
@@ -219,10 +219,47 @@
                 }
             };
 
+            const addMember = async () => {
+                if (!isAdmin) return;
+                const name = prompt("Введите Никнейм нового участника:");
+                if (!name) return;
+                const baseStr = prompt("Введите Базовое вложение (число):", "0");
+                const base = Number(baseStr.replace(/\s/g, ''));
+                if (isNaN(base)) { alert("Неверное число"); return; }
+
+                // Find max ID to prevent collision
+                const maxId = fullData.reduce((max, curr) => Math.max(max, Number(curr.id) || 0), 0);
+                const newId = String(maxId + 1);
+
+                const newMember = {
+                    id: newId,
+                    name: name,
+                    base: base,
+                    intermediate: null,
+                    final: null
+                };
+
+                await setDoc(doc(db, "users", newId), newMember);
+            };
+
+            const removeMember = async (id) => {
+                if (!isAdmin) return;
+                if (confirm("Вы уверены, что хотите удалить этого участника?")) {
+                    await deleteDoc(doc(db, "users", id));
+                }
+            };
+
             return (
                 <div className="bg-white rounded-lg shadow-xl overflow-hidden text-slate-900 border border-slate-300">
                     <div className="p-4 bg-slate-100 border-b flex justify-between items-center">
-                        <h2 className="font-bold text-lg text-slate-700 uppercase tracking-wider">Таблица Вкладов</h2>
+                        <div className="flex items-center gap-4">
+                            <h2 className="font-bold text-lg text-slate-700 uppercase tracking-wider">Таблица Вкладов</h2>
+                            {isAdmin && (
+                                <button onClick={addMember} className="flex items-center gap-1 text-xs bg-green-100 text-green-700 border border-green-200 px-3 py-1 rounded hover:bg-green-200 font-bold">
+                                    <UserPlus size={14} /> Добавить
+                                </button>
+                            )}
+                        </div>
                         {isAdmin && (
                             <button onClick={forceUpload} className="flex items-center gap-2 text-xs bg-slate-200 text-slate-600 px-3 py-1 rounded hover:bg-slate-300">
                                 <Upload size={12} /> Загрузить Демо
@@ -240,6 +277,7 @@
                                     <th className="border p-2 text-right bg-pink-100 text-pink-700">Итоговый</th>
                                     <th className="border p-2 text-right bg-blue-100 text-blue-700">Разница</th>
                                     <th className="border p-2 text-left w-48">Тиры</th>
+                                    {isAdmin && <th className="border p-2 w-10 text-center"></th>}
                                 </tr>
                             </thead>
                             <tbody className="font-mono text-slate-800">
@@ -277,6 +315,13 @@
                                                     ))}
                                                 </div>
                                             </td>
+                                            {isAdmin && (
+                                                <td className="border p-2 text-center">
+                                                    <button onClick={() => removeMember(m.id)} className="text-red-400 hover:text-red-600 transition">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}
@@ -524,7 +569,6 @@
                                             <div className="text-amber-500 font-bold text-sm">{winChance}%</div>
                                         </div>
                                     </div>
-                                    {/* Removed progress bar as requested for clarity */}
                                 </div>
                             ))}
                         </div>
@@ -615,7 +659,7 @@
                 <div className="min-h-screen pb-10">
                     <MoscowClock />
                     
-                    <button onClick={toggleAdmin} className="fixed top-4 right-4 z-50 text-slate-500 hover:text-amber-500 transition bg-slate-900/50 p-2 rounded-full">
+                    <button onClick={toggleAdmin} className="fixed top-4 right-4 z-50 text-slate-500 hover:text-amber-500 transition bg-slate-900/50 p-2 rounded-full pointer-events-auto">
                         {isAdmin ? <Unlock size={20} /> : <Lock size={20} />}
                     </button>
 
