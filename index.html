@@ -42,7 +42,19 @@
         }
     </script>
 
-    <!-- Polyfill for process (Fixes "process is not defined" crash) -->
+    <!-- Error Handler for "Blue Screen" debugging -->
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            const errorContainer = document.getElementById('error-container');
+            if (errorContainer) {
+                errorContainer.style.display = 'block';
+                document.getElementById('error-message').innerText = 
+                    `Ошибка: ${message}\nФайл: ${source}:${lineno}:${colno}\n\n${error ? error.stack : ''}`;
+            }
+        };
+    </script>
+
+    <!-- Polyfill for process -->
     <script>
         window.process = {
             env: {
@@ -81,14 +93,35 @@
         
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+        #error-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            color: #ef4444;
+            padding: 2rem;
+            z-index: 9999;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow: auto;
+        }
     </style>
 </head>
 <body>
+    <div id="error-container">
+        <h1 class="text-2xl font-bold mb-4">Critical Error</h1>
+        <div id="error-message"></div>
+    </div>
+    
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useMemo, useRef } from 'react';
-        import ReactDOM from 'react-dom/client';
+        import { createRoot } from 'react-dom/client';
         import { Users, BarChart3, Dices, Sparkles, Shield, Trash2, Plus, Lock, LogOut, Upload, Save, Percent, Trophy, AlertCircle, RefreshCw } from 'lucide-react';
         import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
         import { motion, useAnimation } from 'framer-motion';
@@ -778,7 +811,7 @@
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+        const root = createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
