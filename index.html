@@ -42,6 +42,14 @@
         }
         // Polyfill for process
         window.process = { env: { NODE_ENV: 'production' } };
+        
+        // Error Handler
+        window.onerror = function(message, source, lineno, colno, error) {
+            const errDiv = document.createElement('div');
+            errDiv.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:red;color:white;padding:20px;z-index:9999;';
+            errDiv.innerHTML = `System Error: ${message} <br> Line: ${lineno}`;
+            document.body.appendChild(errDiv);
+        };
     </script>
 
     <style>
@@ -51,10 +59,6 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
         .excel-input { width: 100%; height: 100%; background: transparent; border: none; outline: none; text-align: right; font-family: 'Courier New', monospace; }
         .excel-input:disabled { background: transparent; color: #334155; cursor: not-allowed; }
-        @keyframes shine {
-            0% { left: -100%; }
-            100% { left: 100%; }
-        }
     </style>
 </head>
 <body>
@@ -63,7 +67,7 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { Lock, Unlock, Trophy, Archive, Table as TableIcon, RefreshCw, Upload, Save, Copy, X } from 'lucide-react';
+        import { Lock, Unlock, Trophy, Archive, Table as TableIcon, RefreshCw, Upload, Save, Copy, X, Calendar } from 'lucide-react';
         
         // --- FIREBASE CONFIGURATION ---
         import { initializeApp } from "firebase/app";
@@ -78,7 +82,6 @@
           appId: "1:891768940412:web:312585e31aade1d7df66f9"
         };
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
@@ -121,45 +124,46 @@
 
         // --- COMPONENT: MOSCOW CLOCK ---
         const MoscowClock = () => {
-            const [time, setTime] = useState("");
+            const [dt, setDt] = useState({ date: "", time: "" });
             useEffect(() => {
                 const tick = () => {
-                    setTime(new Date().toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" }));
+                    const now = new Date();
+                    setDt({
+                        date: now.toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" }),
+                        time: now.toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" })
+                    });
                 };
                 tick();
                 setInterval(tick, 1000);
             }, []);
             return (
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-30 pointer-events-none select-none">
-                    <div className="text-3xl font-black text-amber-500 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-mono">
-                        {time}
+                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-30 pointer-events-none select-none">
+                     <div className="flex items-center gap-2 text-amber-200 text-sm font-bold uppercase tracking-widest drop-shadow-md">
+                        <Calendar size={14} />
+                        {dt.date}
+                     </div>
+                    <div className="text-4xl font-black text-amber-500 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-mono leading-none mt-1">
+                        {dt.time}
                     </div>
-                    <div className="text-[10px] text-amber-200 uppercase tracking-widest font-bold">Москва (UTC+3)</div>
+                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Москва (UTC+3)</div>
                 </div>
             );
         };
 
         // --- COMPONENT: EXCEL TABLE ---
         const ExcelTable = ({ members, isAdmin, fullData }) => {
-            
-            // Function to handle updates. Uses setDoc with merge:true to create doc if missing (hybrid demo mode)
             const updateField = async (id, field, value) => {
                 if (!isAdmin) return;
                 const num = value === '' ? null : Number(value.replace(/\s/g, ''));
                 if (isNaN(num)) return;
                 
-                // Find current data in local state to ensure we save the full object if it's new
                 const currentMember = fullData.find(m => m.id === id);
-                
                 const userRef = doc(db, "users", id);
-                await setDoc(userRef, { 
-                    ...currentMember, 
-                    [field]: num 
-                }, { merge: true });
+                await setDoc(userRef, { ...currentMember, [field]: num }, { merge: true });
             };
 
             const forceUpload = async () => {
-                if (!confirm("Это перезапишет базу данных. Продолжить?")) return;
+                if (!confirm("ВНИМАНИЕ: Это перезапишет базу данных демо-данными. Продолжить?")) return;
                 for (const u of DEMO_DATA) {
                     await setDoc(doc(db, "users", u.id), u);
                 }
@@ -171,7 +175,7 @@
                         <h2 className="font-bold text-lg text-slate-700 uppercase tracking-wider">Таблица Вкладов</h2>
                         {isAdmin && (
                             <button onClick={forceUpload} className="flex items-center gap-2 text-xs bg-slate-200 text-slate-600 px-3 py-1 rounded hover:bg-slate-300">
-                                <Upload size={12} /> Сброс Данных
+                                <Upload size={12} /> Загрузить Демо
                             </button>
                         )}
                     </div>
@@ -183,7 +187,7 @@
                                     <th className="border p-2 text-left">Никнейм</th>
                                     <th className="border p-2 text-right">База (15.11)</th>
                                     <th className="border p-2 text-right bg-white">Промеж.</th>
-                                    <th className="border p-2 text-right bg-pink-100 text-pink-700">Итоговый (01.01)</th>
+                                    <th className="border p-2 text-right bg-pink-100 text-pink-700">Итоговый</th>
                                     <th className="border p-2 text-right bg-blue-100 text-blue-700">Разница</th>
                                     <th className="border p-2 text-left w-48">Тиры</th>
                                 </tr>
@@ -219,9 +223,7 @@
                                             <td className="border p-2">
                                                 <div className="flex flex-wrap gap-1">
                                                     {TIERS.filter(t => diffG >= t).map(t => (
-                                                        <span key={t} className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
-                                                            {t}G
-                                                        </span>
+                                                        <span key={t} className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">{t}G</span>
                                                     ))}
                                                 </div>
                                             </td>
@@ -235,7 +237,7 @@
             );
         };
 
-        // --- COMPONENT: SESSION ROULETTE ---
+        // --- COMPONENT: ROULETTE (FIXED MATH) ---
         const Roulette = ({ members, isAdmin }) => {
             const [currentTierIdx, setCurrentTierIdx] = useState(0);
             const [currentWinCount, setCurrentWinCount] = useState(0);
@@ -251,16 +253,21 @@
             const maxWins = TIER_COUNTS[currentTier];
             const isFinished = currentTierIdx >= TIERS.length;
 
-            const CARD_WIDTH = 150;
-            const WIN_INDEX = 60;
+            // ROULETTE CONSTANTS (PIXEL PERFECT)
+            const ITEM_WIDTH = 220; // Card width
+            const GAP = 16;         // Gap between cards
+            const TOTAL_WIDTH = ITEM_WIDTH + GAP; 
+            const WIN_INDEX = 35;   // Fixed winner index
 
+            // Filter Eligible (Winner Retention: Always check full list)
             const eligible = members.filter(m => getTierG(getDiff(m)) >= currentTier);
 
-            // Tape Init
+            // Init Tape
             useEffect(() => {
                 if(!isSpinning && eligible.length > 0) {
                     const t = [];
-                    for(let i=0; i<WIN_INDEX+10; i++) t.push(eligible[i % eligible.length]);
+                    // Just fill it for visual
+                    for(let i=0; i < 50; i++) t.push(eligible[i % eligible.length]);
                     setTape(t);
                 }
             }, [eligible.length, currentTier]);
@@ -271,7 +278,7 @@
                 setIsSpinning(true);
                 setWinner(null);
 
-                // Weighted Random Logic
+                // 1. Pick Winner (Weighted)
                 const totalDiff = eligible.reduce((sum, m) => sum + getDiff(m), 0);
                 let r = Math.random() * totalDiff;
                 let selected = eligible[0];
@@ -280,35 +287,51 @@
                     if (r < d) { selected = m; break; }
                     r -= d;
                 }
-
-                // Build Tape
-                const newTape = [];
-                for(let i=0; i<WIN_INDEX+10; i++) {
-                    newTape.push(i === WIN_INDEX ? selected : eligible[Math.floor(Math.random()*eligible.length)]);
-                }
-                setTape(newTape);
                 setWinner(selected);
 
-                // Animation Reset
+                // 2. Build Precise Tape
+                const newTape = [];
+                for(let i=0; i < 50; i++) {
+                    if (i === WIN_INDEX) {
+                        newTape.push(selected);
+                    } else {
+                        newTape.push(eligible[Math.floor(Math.random() * eligible.length)]);
+                    }
+                }
+                setTape(newTape);
+
+                // 3. Reset Position
                 if(tapeRef.current) {
                     tapeRef.current.style.transition = 'none';
                     tapeRef.current.style.transform = 'translateX(0px)';
-                    tapeRef.current.offsetHeight; // Reflow
+                    tapeRef.current.offsetHeight; // Force reflow
                     
+                    // 4. Calculate Final Position (Pixel Perfect)
                     const containerW = tapeRef.current.parentElement.offsetWidth;
-                    const center = containerW / 2;
-                    const target = (WIN_INDEX * CARD_WIDTH) + (CARD_WIDTH / 2);
-                    const final = center - target;
+                    const containerCenter = containerW / 2;
+                    
+                    // Center of the winner card relative to start of tape
+                    const winnerCardCenter = (WIN_INDEX * TOTAL_WIDTH) + (ITEM_WIDTH / 2);
+                    
+                    // The basic offset needed to align winner center with container center
+                    const baseOffset = containerCenter - winnerCardCenter;
+                    
+                    // Jitter: Random offset +/- 40% of item width to keep it inside card
+                    // range: -0.4 to 0.4
+                    const jitterFactor = (Math.random() * 0.8) - 0.4; 
+                    const jitterPixels = jitterFactor * ITEM_WIDTH;
+                    
+                    const finalTransform = baseOffset + jitterPixels;
 
                     setTimeout(() => {
                         if(tapeRef.current) {
-                            tapeRef.current.style.transition = 'transform 8s cubic-bezier(0.1, 0, 0, 1)';
-                            tapeRef.current.style.transform = `translateX(${final}px)`;
+                            tapeRef.current.style.transition = 'transform 10s cubic-bezier(0.1, 0, 0, 1)'; // Long slow ease out
+                            tapeRef.current.style.transform = `translateX(${finalTransform}px)`;
                         }
                     }, 50);
                 }
 
-                // Finish
+                // 5. Conclude
                 setTimeout(() => {
                     setIsSpinning(false);
                     const result = {
@@ -319,20 +342,17 @@
                     };
                     setSessionResults(prev => [...prev, result]);
                     
-                    // Logic to advance
                     if (currentWinCount + 1 >= maxWins) {
                         if (currentTierIdx + 1 < TIERS.length) {
                             setCurrentWinCount(0);
                             setCurrentTierIdx(prev => prev + 1);
                         } else {
-                            // End of all tiers
-                            setTimeout(() => setShowModal(true), 1000);
+                            setTimeout(() => setShowModal(true), 1500);
                         }
                     } else {
                         setCurrentWinCount(prev => prev + 1);
                     }
-
-                }, 8500);
+                }, 10500); // 10s animation + buffer
             };
 
             const saveSession = async () => {
@@ -356,7 +376,7 @@
 
             return (
                 <div className="flex flex-col gap-6">
-                    {/* Progress Header */}
+                    {/* Header */}
                     <div className="flex justify-between items-end bg-slate-800 p-4 rounded-xl border border-slate-700">
                         <div>
                             <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Текущий Этап</div>
@@ -373,17 +393,22 @@
                         </div>
                     </div>
 
-                    {/* CS:GO Roulette */}
-                    <div className="bg-slate-900 rounded-xl border-4 border-slate-800 shadow-2xl overflow-hidden relative h-48 flex items-center">
+                    {/* ROULETTE VIEWPORT */}
+                    <div className="bg-slate-900 rounded-xl border-4 border-slate-800 shadow-2xl overflow-hidden relative h-64 flex items-center">
+                         {/* Red Line */}
                          <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-red-600 z-20 shadow-[0_0_15px_red] transform -translate-x-1/2"></div>
-                         <div ref={tapeRef} className="flex h-36 items-center pl-[50%]" style={{ willChange: 'transform' }}>
+                         <div className="absolute left-1/2 top-0 transform -translate-x-1/2 -translate-y-1/2 text-red-500 z-20">▼</div>
+                         <div className="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-1/2 text-red-500 z-20">▲</div>
+
+                         {/* Tape */}
+                         <div ref={tapeRef} className="flex h-48 items-center" style={{ willChange: 'transform' }}>
                             {tape.map((m, i) => (
-                                <div key={i} className={`flex-shrink-0 w-[140px] h-[140px] mx-[5px] bg-slate-800 border-2 ${isSpinning && i === WIN_INDEX ? 'border-amber-500 z-10' : 'border-slate-600'} rounded-lg flex flex-col items-center justify-center p-2 relative shadow-lg`}>
-                                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-slate-400 mb-2">
+                                <div key={i} className={`flex-shrink-0 bg-slate-800 border-2 ${isSpinning && i === WIN_INDEX ? 'border-amber-500 z-10 shadow-[0_0_20px_rgba(245,158,11,0.5)]' : 'border-slate-600'} rounded-lg flex flex-col items-center justify-center p-4 relative shadow-lg mx-[8px]`} style={{ width: '220px', height: '180px' }}>
+                                    <div className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center font-bold text-slate-400 mb-3 text-2xl">
                                         {m.name[0]}
                                     </div>
-                                    <div className="text-[10px] text-slate-400 truncate w-full text-center">{m.name}</div>
-                                    <div className="text-amber-500 font-bold text-sm mt-1">{getTierG(getDiff(m))}G</div>
+                                    <div className="text-sm text-slate-300 truncate w-full text-center font-bold">{m.name}</div>
+                                    <div className="text-amber-500 font-bold text-lg mt-2">{getTierG(getDiff(m))}G</div>
                                 </div>
                             ))}
                          </div>
@@ -394,13 +419,13 @@
                         {winner && !isSpinning && (
                             <div className="text-center animate-bounce">
                                 <div className="text-amber-500 uppercase text-xs font-bold tracking-widest">Победитель раунда</div>
-                                <div className="text-3xl font-black text-white">{winner.name}</div>
+                                <div className="text-4xl font-black text-white">{winner.name}</div>
                             </div>
                         )}
                         
                         {isAdmin ? (
                             <button onClick={spin} disabled={isSpinning || isFinished}
-                                className="px-16 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-900 font-black text-2xl uppercase tracking-[0.2em] rounded-full shadow-[0_0_30px_rgba(245,158,11,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition transform active:scale-95">
+                                className="px-20 py-5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-900 font-black text-2xl uppercase tracking-[0.2em] rounded-full shadow-[0_0_30px_rgba(245,158,11,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition transform active:scale-95">
                                 {isSpinning ? 'КРУТИМ...' : isFinished ? 'СЕССИЯ ЗАВЕРШЕНА' : 'ЗАПУСТИТЬ РАУНД'}
                             </button>
                         ) : (
@@ -426,7 +451,7 @@
                         </div>
                     </div>
 
-                    {/* End Session Modal */}
+                    {/* Modal */}
                     {showModal && (
                         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
                             <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full shadow-2xl relative">
@@ -528,16 +553,13 @@
 
         // --- MAIN APP ---
         const App = () => {
-            // INITIALIZE WITH DEMO DATA SO IT'S NOT EMPTY INITIALLY
             const [members, setMembers] = useState(DEMO_DATA);
             const [tab, setTab] = useState('table');
             const [isAdmin, setIsAdmin] = useState(localStorage.getItem('isAdmin') === 'true');
 
-            // Sync Users
             useEffect(() => {
                 const q = query(collection(db, "users"), orderBy("base", "desc"));
                 const unsub = onSnapshot(q, (snap) => {
-                    // If DB has data, use it. If not, keep local DEMO_DATA (hybrid mode)
                     if (!snap.empty) {
                         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                         setMembers(data);
@@ -563,9 +585,8 @@
 
             return (
                 <div className="min-h-screen pb-10">
-                    {/* Header */}
-                    <header className="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-40 shadow-lg">
-                        <div className="max-w-6xl mx-auto flex justify-between items-center relative">
+                    <header className="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-40 shadow-lg h-24">
+                        <div className="max-w-6xl mx-auto flex justify-between items-center relative h-full">
                             <div className="flex items-center gap-3 z-50 relative">
                                 <div className="bg-amber-500/20 p-2 rounded-lg">
                                     <Trophy className="text-amber-500" size={24} />
@@ -586,7 +607,6 @@
                         </div>
                     </header>
 
-                    {/* Navigation */}
                     <div className="max-w-6xl mx-auto mt-6 px-4">
                         <div className="flex justify-center gap-2 bg-slate-800/50 p-1 rounded-xl w-fit mx-auto backdrop-blur-sm border border-slate-700/50">
                             <button onClick={() => setTab('table')} className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition ${tab === 'table' ? 'bg-amber-500 text-slate-900 shadow-lg' : 'text-slate-400 hover:text-white'}`}>
@@ -601,7 +621,6 @@
                         </div>
                     </div>
 
-                    {/* Content */}
                     <main className="max-w-6xl mx-auto mt-8 px-4">
                         {tab === 'table' && <ExcelTable members={members} isAdmin={isAdmin} fullData={members} />}
                         {tab === 'lottery' && <Roulette members={members} isAdmin={isAdmin} />}
