@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GuildMaster Online (Firebase)</title>
+    <title>GuildMaster Randomizer</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,513 +14,270 @@
                 extend: {
                     colors: {
                         guild: {
-                            900: '#0f172a',
-                            800: '#1e293b',
-                            700: '#334155',
-                            accent: '#8b5cf6', // Violet
-                            gold: '#f59e0b',
+                            900: '#0f172a', // Slate 900
+                            800: '#1e293b', // Slate 800
+                            700: '#334155', // Slate 700
+                            accent: '#f59e0b', // Amber 500 (Gold)
+                        },
+                        indigo: {
+                            600: '#4f46e5',
+                            500: '#6366f1',
+                            400: '#818cf8',
                         }
                     },
                     fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
                     }
                 }
             }
         }
     </script>
 
-    <!-- React & ReactDOM (UMD) -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Polyfill for process (Fixes "process is not defined" crash) -->
+    <script>
+        window.process = {
+            env: {
+                NODE_ENV: 'production',
+                API_KEY: '' 
+            }
+        };
+    </script>
+
+    <!-- Import Map -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.263.1",
+        "recharts": "https://esm.sh/recharts@2.12.0?external=react,react-dom",
+        "framer-motion": "https://esm.sh/framer-motion@10.16.4?external=react,react-dom",
+        "canvas-confetti": "https://esm.sh/canvas-confetti@1.9.2",
+        "@google/genai": "https://esm.sh/@google/genai@0.1.1",
+        "firebase/app": "https://esm.sh/firebase@10.8.0/app",
+        "firebase/firestore": "https://esm.sh/firebase@10.8.0/firestore"
+      }
+    }
+    </script>
     
-    <!-- Babel -->
+    <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Confetti -->
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-
     <style>
-        body { background-color: #0f172a; color: #e2e8f0; }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
-
-        @keyframes shine {
-            0% { transform: translateX(-100%) }
-            100% { transform: translateX(100%) }
-        }
-        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn {
-            0% { opacity: 0; transform: translateY(10px); }
-            100% { opacity: 1; transform: translateY(0); }
-        }
-        .loader {
-            border: 4px solid #1e293b;
-            border-top: 4px solid #8b5cf6;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body { background-color: #0f172a; color: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
         
-        /* Inputs in viewer mode look like text */
-        .viewer-input {
-            background: transparent !important;
-            border: none !important;
-            color: #e2e8f0 !important;
-            pointer-events: none;
-        }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
-
-    <!-- Import Map for Firebase -->
-    <script type="importmap">
-{
-  "imports": {
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24",
-    "canvas-confetti": "https://aistudiocdn.com/canvas-confetti@^1.9.4"
-  }
-}
-</script>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        import { initializeApp } from 'firebase/app';
-        import { 
-            getFirestore, 
-            collection, 
-            onSnapshot, 
-            addDoc, 
-            updateDoc, 
-            deleteDoc, 
-            setDoc,
-            doc, 
-            query, 
-            orderBy, 
-            serverTimestamp 
-        } from 'firebase/firestore';
+        import React, { useState, useEffect, useMemo, useRef } from 'react';
+        import ReactDOM from 'react-dom/client';
+        import { Users, BarChart3, Dices, Sparkles, Shield, Trash2, Plus, Lock, LogOut, Upload, Save, Percent, Trophy, AlertCircle, RefreshCw } from 'lucide-react';
+        import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
+        import { motion, useAnimation } from 'framer-motion';
+        import confetti from 'canvas-confetti';
+        import { GoogleGenAI } from "@google/genai";
+        
+        // --- FIREBASE IMPORTS ---
+        import { initializeApp } from "firebase/app";
+        import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
 
-        const { useState, useEffect, useRef, useMemo } = React;
-
-        // --- FIREBASE CONFIG ---
+        // ==========================================
+        // ⚙️ НАСТРОЙКИ FIREBASE
+        // ==========================================
         const firebaseConfig = {
-            apiKey: "AIzaSyCIFKGZioiflKAAA1tHkIZV0u1sMiPzUjo",
-            authDomain: "random-3fbaa.firebaseapp.com",
-            projectId: "random-3fbaa",
-            storageBucket: "random-3fbaa.firebasestorage.app",
-            messagingSenderId: "891768940412",
-            appId: "1:891768940412:web:312585e31aade1d7df66f9"
+          apiKey: "AIzaSyCIFKGZioiflKAAA1tHkIZV0u1sMiPzUjo",
+          authDomain: "random-3fbaa.firebaseapp.com",
+          projectId: "random-3fbaa",
+          storageBucket: "random-3fbaa.firebasestorage.app",
+          messagingSenderId: "891768940412",
+          appId: "1:891768940412:web:312585e31aade1d7df66f9"
         };
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        // --- ИНИЦИАЛИЗАЦИЯ FIREBASE ---
+        let db = null;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            console.log("Firebase initialized successfully");
+        } catch (e) {
+            console.error("Ошибка инициализации Firebase:", e);
+        }
 
-        // --- DATA CONSTANTS ---
-        const STAGES = [
-            { threshold: 15, prize: "120 💎", count: 3, title: "НОВИЧОК" },
-            { threshold: 25, prize: "180 💎", count: 2, title: "ЛЮБИТЕЛЬ" },
-            { threshold: 50, prize: "400 💎", count: 1, title: "ОПЫТНЫЙ" },
-            { threshold: 75, prize: "600 💎", count: 1, title: "ГРАНД-МАСТЕР" },
-            { threshold: 100, prize: "900 💎", count: 1, title: "ЭЛИТА" },
-            { threshold: 125, prize: "2000 💎", count: 1, title: "ЛЕГЕНДА" },
+        // ==========================================
+        // 💾 ДАННЫЕ ДЛЯ ЗАГРУЗКИ (ПО ЗАПРОСУ)
+        // ==========================================
+        const USER_PROVIDED_DATA = [
+          { name: "Фасоль #51817", current: 150, previous: 0 },
+          { name: "May #97418", current: 723, previous: 0 },
+          { name: "dimandorf #98147", current: 347, previous: 0 },
+          { name: "Nezhdanchick #90542", current: 121, previous: 0 },
+          { name: "Даментор #5030", current: 375, previous: 0 },
+          { name: "Adana #72323", current: 60, previous: 0 },
+          { name: "Acya #62786", current: 241, previous: 0 },
+          { name: "Shadow #24330", current: 97, previous: 0 },
+          { name: "siff #07709", current: 243, previous: 0 },
+          { name: "Mihajlovich #89594", current: 500, previous: 0 },
+          { name: "Zarya #88690", current: 641, previous: 0 },
+          { name: "INK #33036", current: 358, previous: 0 },
+          { name: "Rainer #73242", current: 462, previous: 0 },
+          { name: "Alena #20163", current: 284, previous: 0 },
+          { name: "Alex #46688", current: 920, previous: 0 },
+          { name: "Kalibr #3224", current: 88, previous: 0 },
+          { name: "Aver1 #03710", current: 125, previous: 0 },
+          { name: "Carana #38064", current: 307, previous: 0 }
         ];
 
-        // --- ICONS (SVG) ---
-        const IconShield = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>;
-        const IconUsers = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
-        const IconChart = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>;
-        const IconDices = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="12" height="12" x="2" y="10" rx="2" ry="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01"/><path d="M10 14h.01"/><path d="M15 6h.01"/><path d="M18 9h.01"/></svg>;
-        const IconSparkles = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 5H5"/><path d="M19 21v-4"/><path d="M15 19h4"/></svg>;
-        const IconTrophy = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
-        const IconTrash = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>;
-        const IconPlus = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="M12 5v14"/></svg>;
-        const IconPercent = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="19" x2="5" y1="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>;
-        const IconCloud = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>;
-        const IconLock = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
-        const IconUnlock = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>;
+        // ==========================================
+        // 🛠️ СЕРВИСЫ (AI)
+        // ==========================================
+        const analyzeGuildStats = async (members) => {
+            const apiKey = window.process?.env?.API_KEY || "";
+            if (!apiKey) {
+                return "⚠️ ОШИБКА: API Key не найден. Пожалуйста, убедитесь, что ключ добавлен в process.env.API_KEY.";
+            }
+            try {
+                const ai = new GoogleGenAI({ apiKey: apiKey });
+                
+                const memberData = members.map(m => {
+                    const diff = (m.endScore || 0) - (m.investments || 0);
+                    return `${m.name}: Вложения=${m.investments}, Разница=${diff}`;
+                }).join('\n');
 
-        // --- UTILS ---
-        const analyzeLocally = (members) => {
-            if (!members.length) return "Нет данных для анализа.";
-            const withDiff = members.map(m => ({ ...m, diff: m.endScore - m.investments, name: m.name || "Без имени" }));
-            const mvp = withDiff.reduce((prev, current) => (current.diff > prev.diff) ? current : prev, withDiff[0]);
-            const whale = withDiff.reduce((prev, current) => (current.investments > prev.investments) ? current : prev, withDiff[0]);
-            const worst = withDiff.reduce((prev, current) => (current.diff < prev.diff) ? current : prev, withDiff[0]);
-            const totalInvest = withDiff.reduce((acc, m) => acc + m.investments, 0);
-            const totalScore = withDiff.reduce((acc, m) => acc + m.endScore, 0);
-            const totalProfit = totalScore - totalInvest;
+                const prompt = `
+                Ты аналитик гильдии. Данные:
+                ${memberData}
 
-            return `
-            <div class="space-y-4">
-                <div class="bg-green-900/20 p-4 rounded border border-green-700/50">
-                    <strong class="text-green-400 block text-lg">🏆 MVP Гильдии</strong>
-                    <span class="text-xl font-bold">${mvp.name}</span>
-                    <div class="text-sm text-gray-400">Прибыль: +${mvp.diff.toLocaleString()}</div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-blue-900/20 p-4 rounded border border-blue-700/50">
-                        <strong class="text-blue-400 block">🐋 Главный Инвестор</strong>
-                        <div class="font-bold">${whale.name}</div>
-                        <div class="text-xs text-gray-400">${whale.investments.toLocaleString()} вложено</div>
-                    </div>
-                    <div class="bg-red-900/20 p-4 rounded border border-red-700/50">
-                        <strong class="text-red-400 block">📉 Требует внимания</strong>
-                        <div class="font-bold">${worst.name}</div>
-                        <div class="text-xs text-gray-400">Убыток: ${worst.diff.toLocaleString()}</div>
-                    </div>
-                </div>
-                <div class="bg-guild-900 p-4 rounded">
-                    <strong class="text-gray-300 block mb-2">📊 Сводка</strong>
-                    <ul class="text-sm space-y-1 text-gray-400">
-                        <li>Всего участников: <span class="text-white">${members.length}</span></li>
-                        <li>Общий профит: <span class="${totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}">${totalProfit.toLocaleString()}</span></li>
-                    </ul>
-                </div>
-            </div>`;
+                Дай краткий отчет (Markdown):
+                1. Топ-3 MVP (рост).
+                2. Аутсайдеры (убыток).
+                3. Общий вердикт.
+                `;
+
+                const response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: prompt,
+                });
+                return response.text;
+            } catch (error) {
+                console.error("Gemini Error:", error);
+                return "Ошибка AI сервиса: " + error.message;
+            }
         };
 
-        // --- COMPONENTS ---
+        // ==========================================
+        // 🧩 КОМПОНЕНТЫ
+        // ==========================================
 
-        // 1. ROULETTE
-        const Roulette = ({ participants, winner, isSpinning, onSpinComplete }) => {
-            const containerRef = useRef(null);
-            const [tape, setTape] = useState([]);
-            const [spinState, setSpinState] = useState('idle');
-
-            const CARD_WIDTH = 180;
-            const GAP = 12;
-            const WINNER_INDEX = 60;
-
-            useEffect(() => {
-                if (isSpinning && winner && participants.length > 0) {
-                    setSpinState('idle');
-                    // Generate tape deterministically or randomly, doesn't matter visually as long as winner lines up
-                    const buffer = Array.from({ length: WINNER_INDEX }).map(() => participants[Math.floor(Math.random() * participants.length)]);
-                    const newTape = [...buffer, winner, ...participants.slice(0, 5)];
-                    setTape(newTape);
-                    
-                    // Start animation sequence
-                    setTimeout(() => {
-                        setSpinState('spinning');
-                        // Animation duration is fixed at 8s
-                        setTimeout(() => {
-                            setSpinState('finished');
-                            onSpinComplete();
-                        }, 8000);
-                    }, 100);
-                } else if (!isSpinning) {
-                    // Reset when not spinning
-                    setSpinState('idle');
-                }
-            }, [isSpinning, winner]); // React to external spinning state
-
-            const getTransform = () => {
-                if (spinState === 'idle') return 'translateX(0px)';
-                const cardFullWidth = CARD_WIDTH + GAP;
-                // We add a small random offset to make it look analog, but centered on winner
-                const randomOffset = Math.floor(Math.random() * 40) - 20; 
-                const targetX = -1 * (WINNER_INDEX * cardFullWidth) + (containerRef.current ? containerRef.current.offsetWidth / 2 : 300) - (CARD_WIDTH / 2);
-                return `translateX(${targetX + randomOffset}px)`;
-            };
-
-            if (!isSpinning && spinState !== 'finished') return <div className="w-full h-52 bg-guild-900 rounded-xl border border-guild-700 flex items-center justify-center text-gray-500">Ожидание старта от Админа...</div>;
-
-            return (
-                <div className="relative w-full max-w-5xl mx-auto mb-8 h-52 bg-guild-900 rounded-xl border border-guild-700 overflow-hidden shadow-2xl" ref={containerRef}>
-                    <div className="absolute top-0 bottom-0 left-1/2 w-1 bg-yellow-500 z-30 transform -translate-x-1/2 shadow-[0_0_15px_rgba(234,179,8,0.8)]"></div>
-                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 text-yellow-500 z-30 text-2xl drop-shadow-md">▼</div>
-                    <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-guild-900 to-transparent z-20 pointer-events-none"></div>
-                    <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-guild-900 to-transparent z-20 pointer-events-none"></div>
-                    <div className="flex items-center h-full px-4" style={{ transform: getTransform(), transition: spinState === 'spinning' ? 'transform 8s cubic-bezier(0.1, 0.9, 0.2, 1)' : 'none', willChange: 'transform' }}>
-                        {tape.map((p, i) => {
-                            const isWinnerCard = spinState === 'finished' && i === WINNER_INDEX;
-                            return (
-                                <div key={i} className={`flex-shrink-0 relative rounded-lg flex flex-col items-center justify-center border-2 transition-all duration-500 ${isWinnerCard ? 'border-yellow-500 bg-yellow-900/30 shadow-[0_0_30px_rgba(234,179,8,0.4)] scale-105 z-10' : 'border-guild-700 bg-guild-800'}`} style={{ width: CARD_WIDTH, height: 160, marginRight: GAP }}>
-                                    <div className="w-12 h-12 rounded-full bg-guild-700 flex items-center justify-center mb-2 text-lg font-bold text-gray-300 overflow-hidden">{p.name[0]}</div>
-                                    <div className={`font-bold px-2 text-center truncate w-full ${isWinnerCard ? 'text-yellow-400' : 'text-white'}`}>{p.name}</div>
-                                    <div className="text-xs text-gray-500 mt-1 bg-guild-900/50 px-2 py-1 rounded">Max: {p.score}G</div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            );
-        };
-
-        // 2. CONTEST MANAGER
-        const ContestManager = ({ allParticipants, history, isAdmin }) => {
-            const [stageIdx, setStageIdx] = useState(0);
-            const [winnersFound, setWinnersFound] = useState(0);
-            
-            // State synced from Firebase
-            const [winner, setWinner] = useState(null);
-            const [isSpinning, setIsSpinning] = useState(false);
-            
-            const stage = STAGES[stageIdx];
-            const isFinished = stageIdx >= STAGES.length;
-
-            // LISTEN TO GAME STATE (ROULETTE TRIGGER)
-            useEffect(() => {
-                const unsubscribe = onSnapshot(doc(db, "state", "roulette"), (docSnap) => {
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        // Only trigger if data has changed substantially (e.g. new timestamp or isSpinning toggle)
-                        if (data.isSpinning) {
-                            setWinner(data.winner);
-                            setIsSpinning(true);
-                        } else {
-                            // Reset locally if db says not spinning (usually happens manually or after reset)
-                            setIsSpinning(false);
-                        }
-                    }
-                });
-                return () => unsubscribe();
-            }, []);
-
-            const getCleanScore = (p) => {
-                if (typeof p.score === 'number') return p.score;
-                const cleanString = String(p.score).replace(/[^0-9]/g, '');
-                return parseInt(cleanString, 10) || 0;
-            };
-
-            const eligible = useMemo(() => {
-                if (isFinished) return [];
-                return allParticipants.filter(p => {
-                    const realScore = getCleanScore(p);
-                    const passesThreshold = realScore >= stage.threshold;
-                    const alreadyWonThisStage = history.some(h => h.name === p.name && h.stage === `${stage.threshold}G`);
-                    return passesThreshold && !alreadyWonThisStage;
-                });
-            }, [allParticipants, stage, isFinished, history]);
-
-            const excludedCount = allParticipants.length - eligible.length;
-            const winChance = eligible.length > 0 ? (100 / eligible.length) : 0;
-
-            // ADMIN ONLY: Calculates winner and writes to Firestore
-            const handleSpin = async () => {
-                if (!isAdmin) return;
-                if (!eligible.length) return alert("Нет участников!");
-                
-                const randomWin = eligible[Math.floor(Math.random() * eligible.length)];
-                
-                // Write to DB to trigger everyone's animation
-                await setDoc(doc(db, "state", "roulette"), {
-                    isSpinning: true,
-                    winner: randomWin,
-                    timestamp: Date.now() // Forces update
-                });
-            };
-
-            // Executes locally for everyone when animation ends
-            const handleComplete = async () => {
-                if (!winner) return;
-                
-                if(window.confetti) window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#fbbf24', '#8b5cf6', '#ffffff'] });
-
-                // Logic to advance stage is local visual mainly, but admin commits to history
-                if (isAdmin) {
-                    // SAVE TO FIRESTORE (Only Admin saves to prevent duplicate entries)
-                    try {
-                        await addDoc(collection(db, "history"), {
-                            stage: `${stage.threshold}G`,
-                            name: winner.name,
-                            prize: stage.prize,
-                            score: getCleanScore(winner),
-                            timestamp: serverTimestamp()
-                        });
-                        
-                        // Reset the spinner state in DB so it can be spun again later
-                        // We wait a bit so the confetti finishes
-                        setTimeout(async () => {
-                             await updateDoc(doc(db, "state", "roulette"), {
-                                isSpinning: false
-                            });
-                        }, 5000);
-                        
-                    } catch(e) { console.error("Error saving winner:", e); }
-                }
-
-                // Local Stage Logic (Optimistic UI)
-                if (winnersFound + 1 < stage.count) {
-                    setWinnersFound(prev => prev + 1);
-                } else {
-                    setTimeout(() => {
-                        setWinnersFound(0);
-                        setStageIdx(prev => prev + 1);
-                    }, 2000);
-                }
-            };
-
-            if (isFinished) return (
-                <div className="bg-guild-800 p-8 rounded-xl border-2 border-green-500 max-w-4xl mx-auto shadow-2xl text-center animate-fade-in">
-                    <IconTrophy className="w-24 h-24 text-yellow-500 mx-auto mb-4 animate-bounce" />
-                    <h2 className="text-3xl text-green-400 mb-6 font-bold">🏆 ВСЕ ЭТАПЫ ЗАВЕРШЕНЫ</h2>
-                    <p className="text-gray-400">Вся история побед сохранена в базе данных.</p>
-                </div>
-            );
-
-            return (
-                <div className="w-full max-w-6xl mx-auto space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-gradient-to-br from-blue-900 to-guild-900 p-5 rounded-xl border border-blue-700 shadow-lg relative overflow-hidden">
-                            <div className="relative z-10">
-                                <div className="text-blue-300 text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><IconSparkles className="w-3 h-3" /> {stage.title}</div>
-                                <div className="text-5xl font-black text-white">{stage.threshold}<span className="text-3xl text-blue-400">G</span></div>
-                                <div className="mt-2 text-blue-200 bg-black/20 inline-block px-3 py-1 rounded-lg border border-blue-500/30">Приз: <span className="text-yellow-400 font-bold">{stage.prize}</span></div>
-                            </div>
-                        </div>
-                        <div className="bg-guild-800 p-5 rounded-xl border border-guild-700 flex flex-col justify-center relative">
-                             <div className="text-gray-400 text-xs uppercase mb-2 flex items-center gap-2"><IconTrophy className="w-3 h-3" /> Прогресс этапа</div>
-                             <div className="flex items-end gap-2 z-10">
-                                <span className="text-4xl font-bold text-yellow-500">{winnersFound}</span>
-                                <span className="text-xl text-gray-500 mb-1">/ {stage.count}</span>
-                             </div>
-                             <div className="w-full bg-guild-900 h-2 rounded-full mt-3 overflow-hidden border border-guild-700 z-10">
-                                <div className="bg-yellow-500 h-full transition-all duration-500" style={{ width: `${(winnersFound / stage.count) * 100}%` }}></div>
-                             </div>
-                        </div>
-                        <div className="bg-guild-800 p-5 rounded-xl border border-guild-700 flex flex-col justify-center relative">
-                           <div className="flex justify-between items-center mb-1">
-                             <span className="text-green-400 text-xs font-bold uppercase tracking-wider">Допущены</span>
-                             <span className="text-3xl text-white font-bold">{eligible.length}</span>
-                           </div>
-                           <div className="w-full bg-guild-700 h-px my-2"></div>
-                           <div className="flex justify-between items-center">
-                             <span className="text-red-400 text-xs">Не прошли / Выиграли</span>
-                             <span className="text-lg text-gray-500 font-mono">{excludedCount}</span>
-                           </div>
-                        </div>
-                    </div>
-
-                    <Roulette participants={eligible} winner={winner} isSpinning={isSpinning} onSpinComplete={handleComplete} />
-
-                    {/* BUTTON VISIBLE ONLY TO ADMIN */}
-                    {isAdmin ? (
-                        <div className="flex justify-center">
-                            <button onClick={handleSpin} disabled={isSpinning || eligible.length === 0} className={`relative overflow-hidden px-16 py-5 rounded-2xl text-2xl font-bold uppercase tracking-widest shadow-2xl transition-all transform ${isSpinning || eligible.length === 0 ? 'bg-guild-800 text-gray-600 cursor-not-allowed border border-guild-700' : 'bg-gradient-to-r from-guild-accent to-indigo-600 text-white hover:scale-105 ring-1 ring-indigo-400/50'}`}>
-                                <span className="relative z-10 flex items-center gap-3">{isSpinning ? 'Вращаем...' : 'Разыграть приз'}{!isSpinning && <IconSparkles className="w-5 h-5 text-yellow-300" />}</span>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="text-center text-gray-500 italic">
-                            {isSpinning ? "Идет розыгрыш..." : "Ожидание запуска администратором..."}
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2 bg-guild-800 rounded-xl border border-guild-700 overflow-hidden shadow-lg">
-                            <div className="p-4 border-b border-guild-700 bg-guild-900/50 flex justify-between items-center">
-                                <h3 className="font-bold text-white flex items-center gap-2"><IconPercent className="w-5 h-5 text-guild-accent" /> Шансы на победу</h3>
-                                <span className="text-xs bg-guild-900 text-gray-400 px-2 py-1 rounded border border-guild-700">Всего: {eligible.length}</span>
-                            </div>
-                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-guild-900 text-gray-400 sticky top-0">
-                                        <tr><th className="p-3">Участник</th><th className="p-3 text-center">Лимит</th><th className="p-3 w-2/5">Вероятность</th></tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-guild-700/50">
-                                        {eligible.map((p) => (
-                                            <tr key={p.id} className="hover:bg-guild-700/30 transition-colors">
-                                                <td className="p-3 text-white font-medium">{p.name}</td>
-                                                <td className="p-3 text-center"><span className="bg-guild-900 px-2 py-1 rounded text-xs font-mono text-gray-300 border border-guild-700">{getCleanScore(p)}G</span></td>
-                                                <td className="p-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="flex-1 h-2 bg-guild-900 rounded-full overflow-hidden border border-guild-800">
-                                                            <div className="h-full bg-guild-accent rounded-full" style={{ width: `${Math.max(winChance, 2)}%` }}></div>
-                                                        </div>
-                                                        <span className="text-xs font-mono font-bold text-guild-accent w-12 text-right">{winChance.toFixed(1)}%</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div className="bg-guild-800 rounded-xl border border-guild-700 overflow-hidden shadow-lg">
-                             <div className="p-4 border-b border-guild-700 bg-guild-900/50"><h3 className="font-bold text-white flex items-center gap-2"><IconUsers className="w-5 h-5 text-gray-400" /> История (DB)</h3></div>
-                             <div className="p-4 max-h-[300px] overflow-y-auto custom-scrollbar space-y-2">
-                                {history.length === 0 && <div className="text-gray-500 text-center text-sm">История пуста</div>}
-                                {history.map((h, i) => (
-                                    <div key={i} className="flex justify-between items-center bg-guild-900/50 p-3 rounded border border-guild-700/50 animate-fade-in">
-                                        <div><div className="text-white font-bold text-sm">{h.name}</div><div className="text-[10px] text-gray-500 uppercase">{h.stage}</div></div>
-                                        <div className="text-yellow-400 font-bold text-sm">{h.prize}</div>
-                                    </div>
-                                ))}
-                             </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // 3. STATS CHART
+        // --- 1. График ---
         const StatsChart = ({ members }) => {
-            const data = members.map(m => ({ ...m, diff: m.endScore - m.investments })).sort((a, b) => b.diff - a.diff).slice(0, 15);
-            const maxVal = Math.max(...data.map(d => Math.abs(d.diff))) || 1;
+            const data = useMemo(() => {
+                return members.map(m => ({
+                    ...m,
+                    diff: (m.endScore || 0) - (m.investments || 0)
+                })).sort((a, b) => b.diff - a.diff).slice(0, 15);
+            }, [members]);
 
             return (
-                <div className="w-full bg-guild-800 p-4 rounded-xl border border-guild-700 shadow-lg">
-                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">📊 Топ активности (Итог - Вложения)</h3>
-                    <div className="space-y-3">
-                        {data.map((d, i) => {
-                            const percent = Math.abs(d.diff) / maxVal * 100;
-                            const isPositive = d.diff >= 0;
-                            const barColor = d.diff < 0 ? 'bg-red-500' : i === 0 ? 'bg-yellow-500' : i === 1 ? 'bg-gray-300' : i === 2 ? 'bg-orange-600' : 'bg-indigo-500';
-                            return (
-                                <div key={d.id} className="flex items-center text-sm">
-                                    <div className="w-32 truncate text-gray-300 font-medium">{d.name}</div>
-                                    <div className="flex-1 h-6 bg-guild-900 rounded-sm relative mx-2">
-                                        <div className={`h-full rounded-sm absolute ${barColor} transition-all duration-500`} style={{ width: `${percent}%`, left: isPositive ? '0' : 'auto', right: isPositive ? 'auto' : '0' }}></div>
-                                        <div className="absolute inset-0 flex items-center px-2"><span className="text-xs text-white drop-shadow-md font-bold">{d.diff.toLocaleString()}</span></div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                <div className="w-full h-[400px] bg-guild-800 p-4 rounded-xl border border-guild-700 shadow-lg">
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        📊 Топ активности (Прибыль)
+                    </h3>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                            data={data}
+                            layout="vertical"
+                            margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                            <XAxis type="number" stroke="#94a3b8" tickFormatter={(val) => `${(val / 1000000).toFixed(0)}M`} />
+                            <YAxis 
+                                dataKey="name" 
+                                type="category" 
+                                width={120} 
+                                stroke="#e2e8f0"
+                                tick={{fontSize: 12}}
+                            />
+                            <Tooltip 
+                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#475569', color: '#fff' }}
+                                cursor={{fill: '#334155', opacity: 0.4}}
+                                formatter={(value) => [`${value.toLocaleString()} G`, 'Разница']}
+                            />
+                            <ReferenceLine x={0} stroke="#64748b" />
+                            <Bar dataKey="diff" radius={[0, 4, 4, 0]} barSize={20}>
+                                {data.map((entry, index) => (
+                                    <Cell 
+                                        key={`cell-${index}`} 
+                                        fill={entry.diff < 0 ? '#ef4444' : index === 0 ? '#f59e0b' : index === 1 ? '#cbd5e1' : index === 2 ? '#b45309' : '#8b5cf6'} 
+                                    />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
             );
         };
 
-        // 4. GUILD MANAGER (DB Connected)
-        const GuildManager = ({ members, dates, setDates, isAdmin }) => {
-            const formatNumber = (num) => num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-            const parseNumber = (value) => { const cleaned = value.replace(/\s/g, ''); return cleaned === '' ? 0 : parseInt(cleaned, 10); };
-
-            // DB OPERATIONS (Only work if UI allows, also safeguarded via Rules in real app)
-            const addMember = async () => {
-                await addDoc(collection(db, "users"), {
-                    name: 'Новый Игрок', investments: 0, startScore: 0, endScore: 0, reward: ''
-                });
+        // --- 2. Таблица Управления ---
+        const GuildManager = ({ members, setMembers, dates, setDates, isAdmin }) => {
+            const formatNumber = (num) => num ? num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") : "0";
+            const parseNumber = (value) => {
+                const cleaned = value.replace(/\s/g, '');
+                return cleaned === '' ? 0 : parseInt(cleaned, 10);
             };
 
-            const removeMember = async (id) => {
-                if(confirm("Удалить участника?")) await deleteDoc(doc(db, "users", id));
+            const handleUpdate = async (id, field, value) => {
+                const updatedMembers = members.map(m => m.id === id ? { ...m, [field]: value } : m);
+                setMembers(updatedMembers);
+
+                if (db) {
+                    try {
+                        const docRef = doc(db, "members", id);
+                        await setDoc(docRef, { [field]: value }, { merge: true });
+                    } catch (e) { console.error("Error saving:", e); }
+                }
             };
 
-            const updateField = async (id, field, value) => {
-                await updateDoc(doc(db, "users", id), { [field]: value });
+            const handleRemove = async (id) => {
+                if (!isAdmin) return;
+                if (!confirm("Удалить участника?")) return;
+                setMembers(members.filter(m => m.id !== id));
+                if (db) {
+                    await deleteDoc(doc(db, "members", id));
+                }
             };
 
-            const inputClass = isAdmin 
-                ? "w-full px-2 py-1 outline-none bg-transparent text-black border-b border-transparent focus:border-blue-400" 
-                : "viewer-input w-full px-2 py-1";
-
-            const numberInputClass = isAdmin
-                ? "w-full px-2 py-1 outline-none bg-transparent font-mono text-right text-black border-b border-transparent focus:border-blue-400"
-                : "viewer-input w-full px-2 py-1 text-right";
+            const handleAdd = async () => {
+                const newMember = {
+                    id: Date.now().toString(),
+                    name: 'Новый Игрок',
+                    investments: 0,
+                    startScore: 0,
+                    endScore: 0,
+                    reward: ''
+                };
+                setMembers([...members, newMember]);
+                if (db) {
+                    await setDoc(doc(db, "members", newMember.id), newMember);
+                }
+            };
 
             return (
                 <div className="bg-white rounded-lg shadow-lg overflow-hidden text-black">
@@ -529,182 +287,492 @@
                                 <tr className="bg-gray-100 border-b-2 border-gray-300 text-black">
                                     <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6">Ник</th>
                                     <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6">Вложения</th>
-                                    <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6">Промежуточный</th>
-                                    <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6">Итоговый</th>
+                                    <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6">Старт</th>
+                                    <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6">Итог</th>
                                     <th className="px-4 py-2 text-left font-bold border-r border-gray-300 w-1/6 bg-blue-50 text-blue-900">Разница</th>
-                                    <th className="px-4 py-2 text-left font-bold border-gray-300 w-1/6">15 - 125G</th>
+                                    <th className="px-4 py-2 text-left font-bold border-gray-300 w-1/6">Награда (G)</th>
                                     {isAdmin && <th className="w-10"></th>}
                                 </tr>
                             </thead>
                             <tbody>
-                                {members.map((member, index) => {
-                                    const difference = member.endScore - member.investments;
+                                {members.length === 0 ? (
+                                    <tr><td colSpan={7} className="text-center py-8 text-gray-500">Список пуст. Загрузите данные в админке.</td></tr>
+                                ) : members.map((member, index) => {
+                                    const difference = (member.endScore || 0) - (member.investments || 0);
                                     const diffClass = difference > 0 ? 'text-green-700 font-bold' : difference < 0 ? 'text-red-700' : 'text-black';
+                                    
                                     return (
                                         <tr key={member.id} className={`border-b border-gray-200 hover:bg-blue-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                                            <td className="border-r border-gray-200 p-1"><input disabled={!isAdmin} type="text" value={member.name} onChange={(e) => updateField(member.id, 'name', e.target.value)} className={inputClass} /></td>
-                                            <td className="border-r border-gray-200 p-1"><input disabled={!isAdmin} type="text" value={formatNumber(member.investments)} onChange={(e) => { const val = parseNumber(e.target.value); if (!isNaN(val)) updateField(member.id, 'investments', val); }} className={numberInputClass} /></td>
-                                            <td className="border-r border-gray-200 p-1"><input disabled={!isAdmin} type="number" value={member.startScore || ''} onChange={(e) => updateField(member.id, 'startScore', parseInt(e.target.value) || 0)} className={`${inputClass} text-center`} placeholder="0" /></td>
-                                            <td className="border-r border-gray-200 p-1"><input disabled={!isAdmin} type="number" value={member.endScore || ''} onChange={(e) => updateField(member.id, 'endScore', parseInt(e.target.value) || 0)} className={`${inputClass} text-center`} placeholder="0" /></td>
-                                            <td className={`border-r border-gray-200 p-2 text-center bg-blue-50/50 ${diffClass}`}>{formatNumber(difference)}</td>
-                                            <td className="border-r border-gray-200 p-1"><input disabled={!isAdmin} type="text" value={member.reward} onChange={(e) => updateField(member.id, 'reward', e.target.value)} className={inputClass} placeholder="-" /></td>
-                                            {isAdmin && <td className="p-1 text-center"><button onClick={() => removeMember(member.id)} className="text-red-500 hover:text-red-700 p-1 rounded"><IconTrash className="w-4 h-4" /></button></td>}
+                                            <td className="border-r border-gray-200 p-1">
+                                                <input 
+                                                    type="text" 
+                                                    value={member.name}
+                                                    disabled={!isAdmin}
+                                                    onChange={(e) => handleUpdate(member.id, 'name', e.target.value)}
+                                                    className="w-full px-2 py-1 outline-none bg-transparent font-medium text-black placeholder-gray-400 disabled:opacity-100"
+                                                />
+                                            </td>
+                                            <td className="border-r border-gray-200 p-1">
+                                                <input 
+                                                    type="text" 
+                                                    value={formatNumber(member.investments)}
+                                                    disabled={!isAdmin}
+                                                    onChange={(e) => {
+                                                        const val = parseNumber(e.target.value);
+                                                        if (!isNaN(val)) handleUpdate(member.id, 'investments', val);
+                                                    }}
+                                                    className="w-full px-2 py-1 outline-none bg-transparent font-mono text-right text-black placeholder-gray-400 disabled:opacity-100"
+                                                />
+                                            </td>
+                                            <td className="border-r border-gray-200 p-1">
+                                                <input 
+                                                    type="number" 
+                                                    value={member.startScore || ''}
+                                                    disabled={!isAdmin}
+                                                    onChange={(e) => handleUpdate(member.id, 'startScore', parseInt(e.target.value) || 0)}
+                                                    className="w-full px-2 py-1 outline-none bg-transparent text-center text-black placeholder-gray-400 disabled:opacity-100"
+                                                />
+                                            </td>
+                                            <td className="border-r border-gray-200 p-1">
+                                                <input 
+                                                    type="number" 
+                                                    value={member.endScore || ''}
+                                                    disabled={!isAdmin}
+                                                    onChange={(e) => handleUpdate(member.id, 'endScore', parseInt(e.target.value) || 0)}
+                                                    className="w-full px-2 py-1 outline-none bg-transparent text-center text-black placeholder-gray-400 disabled:opacity-100"
+                                                />
+                                            </td>
+                                            <td className={`border-r border-gray-200 p-2 text-center bg-blue-50/50 ${diffClass}`}>
+                                                {formatNumber(difference)}
+                                            </td>
+                                            <td className="border-r border-gray-200 p-1">
+                                                 <input 
+                                                    type="text" 
+                                                    value={member.reward}
+                                                    disabled={!isAdmin}
+                                                    onChange={(e) => handleUpdate(member.id, 'reward', e.target.value)}
+                                                    className="w-full px-2 py-1 outline-none bg-transparent text-black placeholder-gray-400 disabled:opacity-100"
+                                                />
+                                            </td>
+                                            {isAdmin && (
+                                                <td className="p-1 text-center">
+                                                    <button onClick={() => handleRemove(member.id)} className="text-red-500 hover:text-red-700 p-1 rounded">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}
                                 {isAdmin && (
                                     <tr className="bg-gray-50">
-                                        <td colSpan={7} className="p-2 text-center border-t border-gray-300"><button onClick={addMember} className="flex items-center justify-center gap-2 w-full text-gray-600 hover:text-black py-2 font-medium transition-colors"><IconPlus className="w-4 h-4" /> Добавить строку (DB)</button></td>
+                                        <td colSpan={7} className="p-2 text-center border-t border-gray-300">
+                                            <button onClick={handleAdd} className="flex items-center justify-center gap-2 w-full text-gray-600 hover:text-black py-2 font-medium">
+                                                <Plus className="w-4 h-4" /> Добавить строку
+                                            </button>
+                                        </td>
                                     </tr>
                                 )}
                             </tbody>
-                            <tfoot className="bg-white border-t-2 border-gray-300">
-                                <tr>
-                                    <td className="border-r border-gray-200"></td><td className="border-r border-gray-200"></td>
-                                    <td className="border-r border-gray-200 p-2"><input disabled={!isAdmin} type="text" value={dates.start} onChange={(e) => setDates({...dates, start: e.target.value})} className="w-full text-center italic text-black text-xs outline-none border-b border-transparent focus:border-blue-400 bg-transparent" /></td>
-                                    <td className="border-r border-gray-200 p-2"><input disabled={!isAdmin} type="text" value={dates.end} onChange={(e) => setDates({...dates, end: e.target.value})} className="w-full text-center italic text-black text-xs outline-none border-b border-transparent focus:border-blue-400 bg-transparent" /></td>
-                                    <td colSpan={isAdmin ? 3 : 2}></td>
-                                </tr>
-                            </tfoot>
                         </table>
                     </div>
                 </div>
             );
         };
 
-        // 5. LOTTERY SYSTEM
-        const LotterySystem = ({ members, history, isAdmin }) => {
-            const parseLimit = (value) => { if (!value) return 0; const numbers = value.replace(/\D/g, ''); return numbers ? parseInt(numbers, 10) : 0; };
-            const participants = members.map(m => ({ id: m.id, name: m.name, score: parseLimit(m.reward) })).filter(p => p.score > 0);
+        // --- 3. Система Розыгрыша (Рулетка) ---
+        const Roulette = ({ participants, winner, isSpinning, onSpinComplete }) => {
+            const controls = useAnimation();
+            const containerRef = useRef(null);
+            const [tape, setTape] = useState([]);
+            const [isFinished, setIsFinished] = useState(false);
+
+            const CARD_WIDTH = 180;
+            const GAP = 12;
+            const WINNER_INDEX = 50; 
+
+            useEffect(() => {
+                if (isSpinning) setIsFinished(false);
+                if (isSpinning && winner && participants.length > 0) {
+                    const buffer = Array.from({ length: WINNER_INDEX }).map(() => 
+                        participants[Math.floor(Math.random() * participants.length)]
+                    );
+                    const endBuffer = Array.from({ length: 10 }).map(() =>
+                         participants[Math.floor(Math.random() * participants.length)]
+                    );
+                    setTape([...buffer, winner, ...endBuffer]);
+                    spinToWinner();
+                }
+            }, [isSpinning, winner]);
+
+            const spinToWinner = async () => {
+                if (!containerRef.current) return;
+                await controls.set({ x: 0 });
+                const containerWidth = containerRef.current.offsetWidth;
+                const cardFullWidth = CARD_WIDTH + GAP;
+                const targetX = -1 * (WINNER_INDEX * cardFullWidth) + (containerWidth / 2) - (CARD_WIDTH / 2);
+                const randomOffset = (Math.random() * (CARD_WIDTH * 0.6)) - (CARD_WIDTH * 0.3);
+
+                await controls.start({
+                    x: targetX + randomOffset,
+                    transition: { duration: 6, ease: [0.15, 0.85, 0.35, 1] },
+                });
+                setIsFinished(true);
+                onSpinComplete();
+            };
+
+            if (!isSpinning && !winner && !isFinished) {
+                return <div className="w-full h-52 bg-gray-900 rounded-xl border border-gray-700 flex items-center justify-center text-gray-500">Ожидание старта...</div>;
+            }
 
             return (
-                <div className="w-full">
-                    <div className="mb-8 bg-blue-900/20 border border-blue-500/20 p-4 rounded-lg">
-                        <p className="text-sm text-blue-200">ℹ️ <strong>Правила участия:</strong> Колонка <strong>"15 - 125G"</strong> — максимальный уровень допуска.</p>
-                    </div>
-                    <ContestManager allParticipants={participants} history={history} isAdmin={isAdmin} />
+                <div className="relative w-full max-w-5xl mx-auto mb-8 h-52 bg-gray-900 rounded-xl border border-gray-700 overflow-hidden shadow-2xl" ref={containerRef}>
+                    <div className="absolute top-0 bottom-0 left-1/2 w-1 bg-yellow-500 z-30 transform -translate-x-1/2 shadow-[0_0_15px_rgba(234,179,8,0.8)]"></div>
+                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 text-yellow-500 z-30 text-2xl drop-shadow-md">▼</div>
+                    <motion.div className="flex items-center h-full px-4" initial={{ x: 0 }} animate={controls}>
+                        {tape.map((p, i) => {
+                            const isWinnerCard = isFinished && i === WINNER_INDEX;
+                            return (
+                                <div key={i} className={`flex-shrink-0 relative rounded-lg flex flex-col items-center justify-center border-2 transition-all duration-500 ${isWinnerCard ? 'border-yellow-500 bg-yellow-900/30 shadow-[0_0_30px_rgba(234,179,8,0.4)] scale-105 z-10' : 'border-gray-700 bg-gray-800'}`} style={{ width: CARD_WIDTH, height: 160, marginRight: GAP }}>
+                                    <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center mb-2 text-lg font-bold text-gray-300">{p.name[0]}</div>
+                                    <div className={`font-bold px-2 text-center truncate w-full ${isWinnerCard ? 'text-yellow-400' : 'text-white'}`}>{p.name}</div>
+                                    <div className="text-xs text-gray-500 mt-1 bg-gray-900/50 px-2 py-1 rounded">{p.score} G</div>
+                                </div>
+                            );
+                        })}
+                    </motion.div>
                 </div>
             );
         };
 
-        // 6. MAIN APP
-        const App = () => {
-            const [activeTab, setActiveTab] = useState('members');
-            const [members, setMembers] = useState([]);
+        const STAGES = [
+            { threshold: 15, prize: "120 💎", count: 3, title: "НОВИЧОК" },
+            { threshold: 25, prize: "180 💎", count: 2, title: "ЛЮБИТЕЛЬ" },
+            { threshold: 50, prize: "400 💎", count: 1, title: "ОПЫТНЫЙ" },
+            { threshold: 75, prize: "600 💎", count: 1, title: "ГРАНД-МАСТЕР" },
+            { threshold: 100, prize: "900 💎", count: 1, title: "ЭЛИТА" },
+            { threshold: 125, prize: "2000 💎", count: 1, title: "ЛЕГЕНДА" },
+        ];
+
+        const LotterySystem = ({ members }) => {
+            const [stageIdx, setStageIdx] = useState(0);
             const [history, setHistory] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [aiAnalysis, setAiAnalysis] = useState('');
-            const [dates, setDates] = useState({ start: '15.11.2025', end: '01.01.2026' });
+            const [winner, setWinner] = useState(null);
+            const [isSpinning, setIsSpinning] = useState(false);
+            const [winnersFound, setWinnersFound] = useState(0);
             
-            // ADMIN STATE
-            const [isAdmin, setIsAdmin] = useState(false);
+            const stage = STAGES[stageIdx] || STAGES[STAGES.length - 1];
+            const isFinished = stageIdx >= STAGES.length;
 
-            // LOAD ADMIN STATE
-            useEffect(() => {
-                const storedAdmin = localStorage.getItem('gm_admin');
-                if (storedAdmin === 'true') setIsAdmin(true);
-            }, []);
+            const allParticipants = useMemo(() => members.map(m => {
+                const diff = (m.endScore || 0) - (m.investments || 0);
+                const score = Math.floor(diff / 1000000); // 1M = 1G
+                return {
+                    id: m.id,
+                    name: m.name,
+                    score: score > 0 ? score : 0
+                };
+            }).filter(p => p.score > 0), [members]);
 
-            const toggleAdmin = () => {
-                if (isAdmin) {
-                    setIsAdmin(false);
-                    localStorage.removeItem('gm_admin');
+            const eligible = useMemo(() => {
+                if (isFinished) return [];
+                return allParticipants.filter(p => {
+                    return p.score >= stage.threshold && !history.some(h => h.name === p.name && h.stage === `${stage.threshold}G`);
+                });
+            }, [allParticipants, stage, isFinished, history]);
+
+            const handleSpin = () => {
+                if (!eligible.length) return alert("Нет участников для этой категории!");
+                const randomWin = eligible[Math.floor(Math.random() * eligible.length)];
+                setWinner(randomWin);
+                setIsSpinning(true);
+            };
+
+            const handleComplete = () => {
+                setIsSpinning(false);
+                if (!winner) return;
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#fbbf24', '#8b5cf6', '#ffffff'] });
+                setHistory(prev => [...prev, { stage: `${stage.threshold}G`, name: winner.name, prize: stage.prize }]);
+                if (winnersFound + 1 < stage.count) {
+                    setWinnersFound(p => p + 1);
                 } else {
-                    const pass = prompt("Введите пароль ГМ:");
-                    if (pass === "GM123") {
-                        setIsAdmin(true);
-                        localStorage.setItem('gm_admin', 'true');
-                    } else if (pass) {
-                        alert("Неверный пароль");
-                    }
+                    setTimeout(() => {
+                        setWinnersFound(0);
+                        setStageIdx(p => p + 1);
+                    }, 2000);
                 }
             };
 
-            // SUBSCIBE TO USERS
+            if (isFinished) return (
+                <div className="bg-guild-800 p-8 rounded-xl border-2 border-green-500 max-w-4xl mx-auto shadow-2xl text-center animate-fade-in">
+                    <Trophy className="w-24 h-24 text-yellow-500 mx-auto mb-4 animate-bounce" />
+                    <h2 className="text-3xl text-green-400 mb-6 font-bold">🏆 РОЗЫГРЫШ ЗАВЕРШЕН</h2>
+                    <div className="grid grid-cols-1 gap-2 text-left">{history.map((h, i) => (
+                        <div key={i} className="bg-guild-900 p-4 rounded-lg flex justify-between items-center border border-guild-700">
+                             <div className="flex items-center gap-3"><span className="text-guild-accent font-mono font-bold w-16">{h.stage}</span><span className="text-white font-bold text-lg">{h.name}</span></div>
+                             <span className="text-yellow-400 font-bold">{h.prize}</span>
+                        </div>
+                    ))}</div>
+                </div>
+            );
+
+            return (
+                <div className="w-full max-w-6xl mx-auto space-y-6">
+                    {/* Инфо */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-gradient-to-br from-blue-900 to-guild-900 p-5 rounded-xl border border-blue-700 shadow-lg relative overflow-hidden">
+                            <div className="relative z-10">
+                                <div className="text-blue-300 text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><Sparkles className="w-3 h-3" /> {stage.title}</div>
+                                <div className="text-5xl font-black text-white">{stage.threshold}<span className="text-3xl text-blue-400">G</span></div>
+                                <div className="mt-2 text-blue-200 bg-black/20 inline-block px-3 py-1 rounded-lg border border-blue-500/30">Приз: <span className="text-yellow-400 font-bold">{stage.prize}</span></div>
+                            </div>
+                        </div>
+                        <div className="bg-guild-800 p-5 rounded-xl border border-guild-700 flex flex-col justify-center relative">
+                            <div className="text-gray-400 text-xs uppercase mb-2 flex items-center gap-2"><Trophy className="w-3 h-3" /> Прогресс этапа</div>
+                            <div className="flex items-end gap-2 z-10"><span className="text-4xl font-bold text-yellow-500">{winnersFound}</span><span className="text-xl text-gray-500 mb-1">/ {stage.count}</span></div>
+                            <div className="w-full bg-guild-900 h-2 rounded-full mt-3 overflow-hidden border border-guild-700"><div className="bg-yellow-500 h-full transition-all duration-500" style={{ width: `${(winnersFound / stage.count) * 100}%` }}></div></div>
+                        </div>
+                        <div className="bg-guild-800 p-5 rounded-xl border border-guild-700 flex flex-col justify-center relative">
+                           <div className="flex justify-between items-center mb-1"><span className="text-green-400 text-xs font-bold uppercase tracking-wider">Допущены</span><span className="text-3xl text-white font-bold">{eligible.length}</span></div>
+                           <div className="w-full bg-guild-700 h-px my-2"></div>
+                           <div className="flex justify-between items-center"><span className="text-red-400 text-xs">Не прошли / Выиграли</span><span className="text-lg text-gray-500 font-mono">{allParticipants.length - eligible.length}</span></div>
+                        </div>
+                    </div>
+
+                    <Roulette participants={eligible} winner={winner} isSpinning={isSpinning} onSpinComplete={handleComplete} />
+
+                    <div className="flex justify-center">
+                        <button onClick={handleSpin} disabled={isSpinning || eligible.length === 0} className={`relative overflow-hidden px-16 py-5 rounded-2xl text-2xl font-bold uppercase tracking-widest shadow-2xl transition-all transform ${isSpinning || eligible.length === 0 ? 'bg-guild-800 text-gray-600 cursor-not-allowed border border-guild-700' : 'bg-gradient-to-r from-guild-accent to-indigo-600 text-white hover:scale-105 hover:shadow-indigo-500/30 ring-1 ring-indigo-400/50'}`}>
+                            <span className="relative z-10 flex items-center gap-3">{isSpinning ? 'Вращаем...' : 'Разыграть приз'} {!isSpinning && <Sparkles className="w-5 h-5 text-yellow-300" />}</span>
+                        </button>
+                    </div>
+
+                    {/* Таблица Шансов */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 bg-guild-800 rounded-xl border border-guild-700 overflow-hidden shadow-lg">
+                            <div className="p-4 border-b border-guild-700 bg-guild-900/50 flex justify-between items-center">
+                                <h3 className="font-bold text-white flex items-center gap-2"><Percent className="w-5 h-5 text-guild-accent" /> Шансы (Топ 50)</h3>
+                            </div>
+                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-guild-900 text-gray-400 sticky top-0"><tr><th className="p-3">Участник</th><th className="p-3 text-center">Профит (G)</th><th className="p-3">Шанс</th></tr></thead>
+                                    <tbody className="divide-y divide-guild-700/50">{eligible.slice(0, 50).map(p => (
+                                        <tr key={p.id} className="hover:bg-guild-700/30"><td className="p-3 text-white">{p.name}</td><td className="p-3 text-center font-mono text-gray-300">{p.score}</td><td className="p-3"><span className="text-guild-accent font-bold">{(100/eligible.length).toFixed(1)}%</span></td></tr>
+                                    ))}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div className="bg-guild-800 rounded-xl border border-guild-700 overflow-hidden shadow-lg">
+                            <div className="p-4 border-b border-guild-700 bg-guild-900/50"><h3 className="font-bold text-white flex items-center gap-2"><Users className="w-5 h-5 text-gray-400" /> История Побед</h3></div>
+                            <div className="p-4 max-h-[300px] overflow-y-auto custom-scrollbar space-y-2">
+                                {history.length === 0 && <div className="text-gray-500 text-center italic">Пока пусто</div>}
+                                {history.map((h, i) => (
+                                    <div key={i} className="flex justify-between items-center bg-guild-900/50 p-3 rounded border border-guild-700/50">
+                                        <div><div className="text-white font-bold text-sm">{h.name}</div><div className="text-[10px] text-gray-500 uppercase">{h.stage}</div></div>
+                                        <div className="text-right"><div className="text-yellow-400 font-bold text-sm">{h.prize}</div></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ==========================================
+        // 🚀 ГЛАВНОЕ ПРИЛОЖЕНИЕ
+        // ==========================================
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('members');
+            const [members, setMembers] = useState([]);
+            const [dates, setDates] = useState({ start: '15.11.2025', end: '01.01.2026' });
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [passwordInput, setPasswordInput] = useState("");
+            const [showLogin, setShowLogin] = useState(false);
+            const [aiAnalysis, setAiAnalysis] = useState('');
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+
             useEffect(() => {
-                const q = query(collection(db, "users"));
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const loadedMembers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // Simple local sort by name or id could be added here
-                    setMembers(loadedMembers);
-                    setLoading(false);
-                });
-                return () => unsubscribe();
+                if (db) {
+                    try {
+                        const unsubscribe = onSnapshot(collection(db, "members"), (snapshot) => {
+                            const loadedMembers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            loadedMembers.sort((a,b) => parseInt(a.id || 0) - parseInt(b.id || 0));
+                            setMembers(loadedMembers);
+                        }, (error) => {
+                            console.error("Snapshot error:", error);
+                        });
+                        return () => unsubscribe();
+                    } catch (err) {
+                        console.error("Firebase connection error:", err);
+                    }
+                }
             }, []);
 
-            // SUBSCRIBE TO HISTORY
-            useEffect(() => {
-                const q = query(collection(db, "history"), orderBy("timestamp", "desc"));
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const loadedHistory = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setHistory(loadedHistory);
-                });
-                return () => unsubscribe();
-            }, []);
-
-            const handleAnalyze = () => {
-                const result = analyzeLocally(members);
-                setAiAnalysis(result);
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (passwordInput === "GM123") {
+                    setIsAdmin(true);
+                    setShowLogin(false);
+                    setPasswordInput("");
+                } else {
+                    alert("Неверный пароль!");
+                }
             };
 
-            if (loading) {
-                return <div className="min-h-screen bg-guild-900 flex items-center justify-center flex-col gap-4">
-                    <div className="loader"></div>
-                    <div className="text-gray-400">Связь с сервером Firebase...</div>
-                </div>;
-            }
+            // 3. Загрузка данных в БД (Кнопка восстановления)
+            const uploadUserData = async () => {
+                if (!db) {
+                    alert("Ошибка: Firebase не подключен.");
+                    return;
+                }
+                if (!confirm(`Загрузить список гильдии (${USER_PROVIDED_DATA.length} участников)? Это перезапишет текущие данные.`)) return;
+                
+                try {
+                    // Удаляем старые (опционально, но чище для демо)
+                    const batch = writeBatch(db);
+                    
+                    // Для простоты просто добавляем/перезаписываем по ID
+                    USER_PROVIDED_DATA.forEach((user, index) => {
+                        const id = (1000 + index).toString(); // Простой ID
+                        const ref = doc(db, "members", id);
+                        
+                        // Маппинг данных пользователя в структуру приложения
+                        // user.current (150) -> investments (150 000 000)
+                        // user.previous (0) -> startScore (0)
+                        // endScore = investments (чтобы разница была 0 изначально, или можно настроить иначе)
+                        const valInMillions = user.current * 1000000;
+                        
+                        batch.set(ref, {
+                            id: id,
+                            name: user.name,
+                            investments: valInMillions, 
+                            startScore: user.previous * 1000000,
+                            endScore: valInMillions, 
+                            reward: ''
+                        });
+                    });
+                    
+                    await batch.commit();
+                    alert(`Успешно загружено ${USER_PROVIDED_DATA.length} участников!`);
+                } catch (error) {
+                    console.error("Ошибка загрузки:", error);
+                    alert("Ошибка при загрузке: " + error.message);
+                }
+            };
+
+            const handleAnalyze = async () => {
+                setIsAnalyzing(true);
+                const res = await analyzeGuildStats(members);
+                setAiAnalysis(res);
+                setIsAnalyzing(false);
+            };
 
             return (
                 <div className="min-h-screen bg-guild-900 text-gray-100 font-sans pb-12">
+                    {/* Header */}
                     <header className="bg-guild-800 border-b border-guild-700 sticky top-0 z-50 shadow-md">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <div className="bg-guild-accent p-2 rounded-lg"><IconShield className="w-6 h-6 text-white" /></div>
+                                <div className="bg-guild-accent p-2 rounded-lg"><Shield className="w-6 h-6 text-white" /></div>
                                 <h1 className="text-xl font-bold tracking-wide text-white">Guild<span className="text-guild-accent">Master</span></h1>
-                                <span className="text-xs px-2 py-0.5 rounded bg-green-900 text-green-400 border border-green-700 ml-2 flex items-center gap-1"><IconCloud className="w-3 h-3" /> Online</span>
                             </div>
-                            <nav className="flex items-center gap-1 md:gap-4">
-                                <button onClick={() => setActiveTab('members')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'members' ? 'bg-guild-700 text-white shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-guild-800'}`}><IconUsers className="w-4 h-4" /><span className="hidden md:inline">Таблица</span></button>
-                                <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'stats' ? 'bg-guild-700 text-white shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-guild-800'}`}><IconChart className="w-4 h-4" /><span className="hidden md:inline">Статистика</span></button>
-                                <button onClick={() => setActiveTab('lottery')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'lottery' ? 'bg-guild-700 text-white shadow-inner' : 'text-gray-400 hover:text-gray-200 hover:bg-guild-800'}`}><IconDices className="w-4 h-4" /><span className="hidden md:inline">Розыгрыш</span></button>
-                                
-                                {/* ADMIN TOGGLE */}
-                                <div className="ml-4 border-l border-guild-700 pl-4">
-                                    <button onClick={toggleAdmin} className={`p-2 rounded-full hover:bg-guild-700 transition-colors ${isAdmin ? 'text-green-400' : 'text-gray-500'}`}>
-                                        {isAdmin ? <IconUnlock className="w-5 h-5" /> : <IconLock className="w-5 h-5" />}
-                                    </button>
+                            
+                            <div className="flex items-center gap-4">
+                                <nav className="flex gap-1 md:gap-4">
+                                    <button onClick={() => setActiveTab('members')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'members' ? 'bg-guild-700 text-white' : 'text-gray-400 hover:text-white'}`}><Users className="w-4 h-4" /><span className="hidden md:inline">Таблица</span></button>
+                                    <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'stats' ? 'bg-guild-700 text-white' : 'text-gray-400 hover:text-white'}`}><BarChart3 className="w-4 h-4" /><span className="hidden md:inline">Статистика</span></button>
+                                    <button onClick={() => setActiveTab('lottery')} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'lottery' ? 'bg-guild-700 text-white' : 'text-gray-400 hover:text-white'}`}><Dices className="w-4 h-4" /><span className="hidden md:inline">Розыгрыш</span></button>
+                                </nav>
+                                <div className="border-l border-guild-700 pl-4">
+                                    {isAdmin ? (
+                                        <button onClick={() => setIsAdmin(false)} className="flex items-center gap-2 text-red-400 hover:text-red-300" title="Выйти из админки">
+                                            <LogOut className="w-5 h-5" />
+                                        </button>
+                                    ) : (
+                                        <button onClick={() => setShowLogin(true)} className="flex items-center gap-2 text-gray-400 hover:text-white" title="Войти как GM">
+                                            <Lock className="w-5 h-5" />
+                                        </button>
+                                    )}
                                 </div>
-                            </nav>
+                            </div>
                         </div>
                     </header>
-                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                        <div className="animate-fade-in">
-                            {activeTab === 'members' && <div className="space-y-6"><GuildManager members={members} dates={dates} setDates={setDates} isAdmin={isAdmin} /></div>}
-                            {activeTab === 'stats' && (
-                                <div className="space-y-8">
-                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                        <h2 className="text-2xl font-bold text-white">Анализ Прогресса</h2>
-                                        <button onClick={handleAnalyze} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"><IconSparkles className="w-4 h-4" />Сгенерировать отчет</button>
-                                    </div>
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                        <StatsChart members={members} />
-                                        <div className="bg-guild-800 p-6 rounded-xl border border-guild-700 shadow-lg min-h-[400px]">
-                                            <h3 className="text-xl font-bold text-white mb-4 border-b border-guild-700 pb-2">Отчет</h3>
-                                            {aiAnalysis ? <div className="prose prose-invert prose-sm max-w-none"><div dangerouslySetInnerHTML={{ __html: aiAnalysis }} /></div> : <div className="flex flex-col items-center justify-center h-[300px] text-gray-500"><IconSparkles className="w-12 h-12 mb-4 opacity-20" /><p className="text-center max-w-xs">Нажмите кнопку выше для анализа.</p></div>}
-                                        </div>
-                                    </div>
+
+                    {/* Модалка логина */}
+                    {showLogin && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100]">
+                            <form onSubmit={handleLogin} className="bg-guild-800 p-6 rounded-xl border border-guild-700 shadow-2xl w-80">
+                                <h3 className="text-xl font-bold text-white mb-4">Доступ GM</h3>
+                                <input 
+                                    type="password" 
+                                    value={passwordInput} 
+                                    onChange={e => setPasswordInput(e.target.value)} 
+                                    className="w-full bg-guild-900 border border-guild-700 rounded p-2 text-white mb-4 outline-none focus:border-guild-accent"
+                                    placeholder="Пароль"
+                                    autoFocus
+                                />
+                                <div className="flex gap-2 justify-end">
+                                    <button type="button" onClick={() => setShowLogin(false)} className="px-3 py-1 text-gray-400 hover:text-white">Отмена</button>
+                                    <button type="submit" className="bg-guild-accent text-white px-4 py-1 rounded hover:bg-yellow-600">Войти</button>
                                 </div>
-                            )}
-                            {activeTab === 'lottery' && (
-                                <div className="space-y-6">
-                                    <div className="mb-4 flex justify-between items-center">
-                                        <h2 className="text-2xl font-bold text-white">Великий Рандом</h2>
-                                        {!isAdmin && <span className="text-xs bg-blue-900 text-blue-200 px-2 py-1 rounded border border-blue-700">Режим Зрителя</span>}
-                                    </div>
-                                    <LotterySystem members={members} history={history} isAdmin={isAdmin} />
-                                </div>
-                            )}
+                            </form>
                         </div>
+                    )}
+
+                    {/* Main Content */}
+                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+                        
+                        {/* Панель администратора (только если залогинен) */}
+                        {isAdmin && (
+                            <div className="mb-8 p-4 bg-red-900/20 border border-red-500/30 rounded-lg flex flex-col md:flex-row justify-between items-center gap-4">
+                                <div className="flex items-center gap-3">
+                                    <Shield className="w-6 h-6 text-red-400" />
+                                    <div>
+                                        <h3 className="font-bold text-red-100">Режим Администратора</h3>
+                                        <p className="text-xs text-red-300">Вы можете редактировать таблицу и управлять данными.</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                     <button 
+                                        onClick={uploadUserData}
+                                        className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold shadow-lg transition-transform hover:scale-105"
+                                    >
+                                        <RefreshCw className="w-4 h-4" /> Загрузить Список Гильдии
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'members' && (
+                            <GuildManager members={members} setMembers={setMembers} dates={dates} setDates={setDates} isAdmin={isAdmin} />
+                        )}
+
+                        {activeTab === 'stats' && (
+                            <div className="space-y-8">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-2xl font-bold text-white">Анализ Прогресса</h2>
+                                    <button onClick={handleAnalyze} disabled={isAnalyzing} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50">
+                                        <Sparkles className="w-4 h-4" /> {isAnalyzing ? 'Думаю...' : 'Спросить Оракула (AI)'}
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    <StatsChart members={members} />
+                                    <div className="bg-guild-800 p-6 rounded-xl border border-guild-700 shadow-lg min-h-[400px]">
+                                        <h3 className="text-xl font-bold text-white mb-4 border-b border-guild-700 pb-2">Отчет Оракула</h3>
+                                        {aiAnalysis ? (
+                                            <div className="prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: aiAnalysis.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong class="text-guild-accent">$1</strong>') }} />
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center h-[300px] text-gray-500"><Sparkles className="w-12 h-12 mb-4 opacity-20" /><p className="text-center">Нажмите кнопку выше для анализа.</p></div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'lottery' && (
+                            <LotterySystem members={members} />
+                        )}
                     </main>
                 </div>
             );
