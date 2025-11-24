@@ -4,68 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GuildMaster Randomizer</title>
+    <title>Guild Ionia - Master Randomizer</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        guild: {
-                            900: '#0f172a',
-                            800: '#1e293b',
-                            700: '#334155',
-                            accent: '#f59e0b',
-                        },
-                        indigo: {
-                            600: '#4f46e5',
-                            500: '#6366f1',
-                        }
-                    },
-                    animation: {
-                        'fade-in': 'fadeIn 0.5s ease-out forwards',
-                    },
-                    keyframes: {
-                        fadeIn: {
-                            '0%': { opacity: '0', transform: 'translateY(10px)' },
-                            '100%': { opacity: '1', transform: 'translateY(0)' },
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
-    <!-- 1. Strict Error Handler (First thing to run) -->
-    <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            document.body.innerHTML = '<div style="background:white;color:red;padding:20px;z-index:9999;position:fixed;top:0;left:0;width:100%;height:100%;font-size:16px;font-family:monospace;white-space:pre-wrap;overflow:auto;">' + 
-            '<strong>КРИТИЧЕСКАЯ ОШИБКА:</strong>\n' + message + 
-            '\n\n<strong>Источник:</strong> ' + source + ':' + lineno + 
-            '\n\n<strong>Стек:</strong>\n' + (error ? error.stack : 'Нет стека') + '</div>';
-            console.error(error);
-        };
-        
-        // Polyfill for Gemini SDK
-        window.process = { env: { NODE_ENV: 'production', API_KEY: '' } };
-    </script>
-
-    <!-- 2. Import Map (Requested Configuration) -->
+    
+    <!-- Import Map -->
     <script type="importmap">
     {
       "imports": {
         "react": "https://esm.sh/react@18.2.0",
-        "react-dom": "https://esm.sh/react-dom@18.2.0",
         "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
         "lucide-react": "https://esm.sh/lucide-react@0.263.1",
-        "recharts": "https://esm.sh/recharts@2.12.0?external=react,react-dom",
-        "framer-motion": "https://esm.sh/framer-motion@10.16.4?external=react,react-dom",
-        "canvas-confetti": "https://esm.sh/canvas-confetti@1.9.2",
-        "@google/genai": "https://esm.sh/@google/genai@0.1.1",
-        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
-        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
       }
     }
     </script>
@@ -73,30 +25,49 @@
     <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#151e32', 900: '#0f172a', 950: '#020617' },
+                        amber: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' }
+                    },
+                    fontFamily: {
+                        mono: ['Consolas', 'Monaco', 'Courier New', 'monospace'],
+                    }
+                }
+            }
+        }
+        // Polyfill for process
+        window.process = { env: { NODE_ENV: 'production' } };
+    </script>
+
     <style>
-        body { background-color: #0f172a; color: #f1f5f9; }
+        body { background-color: #0f172a; color: white; font-family: 'Segoe UI', sans-serif; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-        .input-dark { background: transparent; border-bottom: 1px solid #475569; color: white; padding: 4px; outline: none; width: 100%; }
-        .input-dark:focus { border-color: #f59e0b; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        .excel-input { width: 100%; height: 100%; background: transparent; border: none; outline: none; text-align: right; font-family: 'Courier New', monospace; }
+        .excel-input:disabled { background: transparent; color: #334155; cursor: not-allowed; }
+        @keyframes shine {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo, useRef } from 'react';
+        import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { Users, BarChart3, Dices, Sparkles, Shield, Trash2, Plus, Lock, LogOut, RefreshCw, Trophy, Percent, Save } from 'lucide-react';
-        import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
-        import { motion, useAnimation } from 'framer-motion';
-        import confetti from 'canvas-confetti';
-        import { GoogleGenAI } from "@google/genai";
+        import { Lock, Unlock, Trophy, Archive, Table as TableIcon, RefreshCw, Upload, Save, Copy, X } from 'lucide-react';
         
-        // --- FIREBASE ---
+        // --- FIREBASE CONFIGURATION ---
         import { initializeApp } from "firebase/app";
-        import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
+        import { getFirestore, collection, onSnapshot, doc, updateDoc, setDoc, addDoc, query, orderBy } from "firebase/firestore";
 
         const firebaseConfig = {
           apiKey: "AIzaSyCIFKGZioiflKAAA1tHkIZV0u1sMiPzUjo",
@@ -107,143 +78,442 @@
           appId: "1:891768940412:web:312585e31aade1d7df66f9"
         };
 
-        let db;
-        try {
-            const app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-        } catch (e) {
-            console.error("Firebase init failed:", e);
-        }
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-        // --- ДАННЫЕ ДЛЯ ВОССТАНОВЛЕНИЯ (HARDCODED) ---
-        const RESTORE_DATA = [
-            { name: "Фасоль #51817", current: 150 },
-            { name: "May #97418", current: 723 },
-            { name: "dimandorf #98147", current: 347 },
-            { name: "Nezhdanchick #90542", current: 121 },
-            { name: "Даментор #5030", current: 375 },
-            { name: "Adana #72323", current: 60 },
-            { name: "Acya #62786", current: 241 },
-            { name: "Shadow #24330", current: 97 },
-            { name: "siff #07709", current: 243 },
-            { name: "Mihajlovich #89594", current: 500 },
-            { name: "Zarya #88690", current: 641 },
-            { name: "INK #33036", current: 358 },
-            { name: "Rainer #73242", current: 462 },
-            { name: "Alena #20163", current: 284 },
-            { name: "Alex #46688", current: 920 },
-            { name: "Kalibr #3224", current: 88 },
-            { name: "Aver1 #03710", current: 125 },
-            { name: "Carana #38064", current: 307 }
+        // --- CONSTANTS ---
+        const DEMO_DATA = [
+            { id: '1', name: "Фасоль#51817", base: 150818174500, final: null },
+            { id: '2', name: "Мяу#97418", base: 723767374500, final: null },
+            { id: '3', name: "dimandorf#98147", base: 347739374500, final: null },
+            { id: '4', name: "Nezhdanchick#90542", base: 121985674500, final: null },
+            { id: '5', name: "Дэментор#5030", base: 375947374500, final: null },
+            { id: '6', name: "Adanei#72323", base: 60665339100, final: null },
+            { id: '7', name: "Асула#92795", base: 241222674500, final: null },
+            { id: '8', name: "Shadow#24330", base: 97337374500, final: null },
+            { id: '9', name: "selfaa#67769", base: 243840424500, final: null },
+            { id: '10', name: "Mihaqlovich#89594", base: 500117374500, final: null },
+            { id: '11', name: "Zarya#88899", base: 641617374500, final: null },
+            { id: '12', name: "INKI#33936", base: 358867374500, final: null },
+            { id: '13', name: "Rainer#73242", base: 462659374500, final: null },
+            { id: '14', name: "Алена#20153", base: 284313374500, final: null },
+            { id: '15', name: "Алекс#46688", base: 920007374500, final: null },
+            { id: '16', name: "Калямбус#3224", base: 88030874500, final: null },
+            { id: '17', name: "Aver1n#93710", base: 125861370700, final: null },
+            { id: '18', name: "Сатана#38064", base: 307767374500, final: null },
+            { id: '19', name: "Nipi#58068", base: 163467488400, final: null },
+            { id: '20', name: "YuryQ#38320", base: 617395374500, final: null }
         ];
 
-        // --- AI ---
-        const analyzeGuildStats = async (members) => {
-            const apiKey = window.process?.env?.API_KEY || "";
-            if (!apiKey) return "API Key not found inside window.process.env.API_KEY";
-            
-            try {
-                const ai = new GoogleGenAI({ apiKey });
-                const prompt = `Анализируй гильдию. Данные (Имя: Вложения): \n${members.map(m=>`${m.name}: ${m.investments}`).join('\n')}. Дай краткий ТОП-3 и советы.`;
-                const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-                return response.text;
-            } catch (e) {
-                return "Ошибка AI: " + e.message;
-            }
+        const TIERS = [15, 25, 50, 75, 100, 125];
+        const TIER_PRIZES = { 15: 120, 25: 180, 50: 400, 75: 600, 100: 900, 125: 2000 };
+        const TIER_COUNTS = { 15: 3, 25: 2, 50: 1, 75: 1, 100: 1, 125: 1 };
+
+        // --- UTILS ---
+        const fmt = (n) => new Intl.NumberFormat('ru-RU').format(n);
+        const getDiff = (m) => {
+            const cur = m.final !== null ? m.final : (m.intermediate !== null ? m.intermediate : m.base);
+            const diff = cur - m.base;
+            return diff < 0 ? 0 : diff;
         };
+        const getTierG = (diff) => Math.floor(diff / 1_000_000_000);
 
-        // --- COMPONENTS ---
-
-        const StatsChart = ({ members }) => {
-            const data = useMemo(() => {
-                return members.map(m => ({ ...m, diff: (m.endScore || m.investments) - m.investments }))
-                              .sort((a,b) => b.investments - a.investments).slice(0, 15);
-            }, [members]);
-
+        // --- COMPONENT: MOSCOW CLOCK ---
+        const MoscowClock = () => {
+            const [time, setTime] = useState("");
+            useEffect(() => {
+                const tick = () => {
+                    setTime(new Date().toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" }));
+                };
+                tick();
+                setInterval(tick, 1000);
+            }, []);
             return (
-                <div className="h-[400px] w-full bg-guild-800 p-4 rounded-xl border border-guild-700">
-                    <ResponsiveContainer>
-                        <BarChart data={data} layout="vertical" margin={{left: 40}}>
-                            <CartesianGrid stroke="#334155" horizontal={false} />
-                            <XAxis type="number" stroke="#94a3b8" />
-                            <YAxis dataKey="name" type="category" width={100} stroke="#e2e8f0" />
-                            <Tooltip contentStyle={{backgroundColor: '#1e293b', color: '#fff'}} />
-                            <Bar dataKey="investments" fill="#f59e0b" radius={[0, 4, 4, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-50">
+                    <div className="text-3xl font-black text-amber-500 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-mono">
+                        {time}
+                    </div>
+                    <div className="text-[10px] text-amber-200 uppercase tracking-widest font-bold">Москва (UTC+3)</div>
                 </div>
             );
         };
 
-        const GuildManager = ({ members, setMembers, isAdmin }) => {
-            const updateMember = async (id, field, val) => {
-                setMembers(prev => prev.map(m => m.id === id ? { ...m, [field]: val } : m));
-                if (db) await setDoc(doc(db, "members", id), { [field]: val }, { merge: true });
+        // --- COMPONENT: EXCEL TABLE ---
+        const ExcelTable = ({ members, isAdmin }) => {
+            const updateField = async (id, field, value) => {
+                if (!isAdmin) return;
+                const num = value === '' ? null : Number(value.replace(/\s/g, ''));
+                if (isNaN(num)) return;
+                
+                const userRef = doc(db, "users", id);
+                await updateDoc(userRef, { [field]: num });
             };
 
-            const deleteMember = async (id) => {
-                if(!confirm("Удалить?")) return;
-                setMembers(prev => prev.filter(m => m.id !== id));
-                if (db) await deleteDoc(doc(db, "members", id));
-            };
-
-            return (
-                <div className="bg-white rounded-lg overflow-hidden text-black shadow">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-100 border-b">
-                            <tr>
-                                <th className="p-3 text-left">Имя</th>
-                                <th className="p-3 text-left">Вложения</th>
-                                <th className="p-3 text-left">Итог</th>
-                                {isAdmin && <th className="p-3">Действия</th>}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {members.map(m => (
-                                <tr key={m.id} className="border-b hover:bg-blue-50">
-                                    <td className="p-2"><input disabled={!isAdmin} className="bg-transparent w-full" value={m.name} onChange={e=>updateMember(m.id, 'name', e.target.value)} /></td>
-                                    <td className="p-2"><input disabled={!isAdmin} type="number" className="bg-transparent w-full font-mono" value={m.investments} onChange={e=>updateMember(m.id, 'investments', Number(e.target.value))} /></td>
-                                    <td className="p-2"><input disabled={!isAdmin} type="number" className="bg-transparent w-full font-mono" value={m.endScore} onChange={e=>updateMember(m.id, 'endScore', Number(e.target.value))} /></td>
-                                    {isAdmin && <td className="p-2 text-center"><button onClick={()=>deleteMember(m.id)} className="text-red-500"><Trash2 size={16}/></button></td>}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            );
-        };
-
-        const Roulette = ({ participants }) => {
-            const [spinning, setSpinning] = useState(false);
-            const [winner, setWinner] = useState(null);
-            
-            const spin = () => {
-                if(participants.length === 0) return;
-                setSpinning(true);
-                setWinner(null);
-                setTimeout(() => {
-                    const w = participants[Math.floor(Math.random() * participants.length)];
-                    setWinner(w);
-                    setSpinning(false);
-                    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-                }, 3000);
+            const uploadDemo = async () => {
+                if (!confirm("Это перезапишет базу данных. Продолжить?")) return;
+                for (const u of DEMO_DATA) {
+                    await setDoc(doc(db, "users", u.id), u);
+                }
             };
 
             return (
-                <div className="text-center p-8 bg-guild-800 rounded-xl border border-guild-700">
-                    <div className="h-40 flex items-center justify-center mb-6 bg-guild-900 rounded-lg border border-guild-700 relative overflow-hidden">
-                        {spinning ? (
-                            <div className="animate-pulse text-4xl font-bold text-yellow-500">Вращение...</div>
-                        ) : winner ? (
-                            <div className="text-4xl font-bold text-green-400 animate-bounce">{winner.name}</div>
-                        ) : (
-                            <div className="text-gray-500">Нажмите Старт</div>
+                <div className="bg-white rounded-lg shadow-xl overflow-hidden text-slate-900 border border-slate-300">
+                    <div className="p-4 bg-slate-100 border-b flex justify-between items-center">
+                        <h2 className="font-bold text-lg text-slate-700 uppercase tracking-wider">Таблица Вкладов</h2>
+                        {isAdmin && members.length === 0 && (
+                            <button onClick={uploadDemo} className="flex items-center gap-2 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                                <Upload size={12} /> Загрузить Демо
+                            </button>
                         )}
                     </div>
-                    <button onClick={spin} disabled={spinning || participants.length === 0} className="bg-guild-accent text-white px-8 py-3 rounded-xl font-bold text-xl hover:scale-105 transition-transform disabled:opacity-50">
-                        {spinning ? 'Удачи...' : 'КРУТИТЬ!'}
-                    </button>
-                    <div className="mt-4 text-gray-400">Участников: {participants.length}</div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                            <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase">
+                                <tr>
+                                    <th className="border p-2 w-10 text-center">#</th>
+                                    <th className="border p-2 text-left">Никнейм</th>
+                                    <th className="border p-2 text-right">База (15.11)</th>
+                                    <th className="border p-2 text-right bg-white">Промеж.</th>
+                                    <th className="border p-2 text-right bg-pink-100 text-pink-700">Итоговый (01.01)</th>
+                                    <th className="border p-2 text-right bg-blue-100 text-blue-700">Разница</th>
+                                    <th className="border p-2 text-left w-48">Тиры</th>
+                                </tr>
+                            </thead>
+                            <tbody className="font-mono text-slate-800">
+                                {members.map((m, idx) => {
+                                    const diff = getDiff(m);
+                                    const diffG = getTierG(diff);
+                                    return (
+                                        <tr key={m.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50 hover:bg-slate-100'}>
+                                            <td className="border p-2 text-center text-slate-400">{idx+1}</td>
+                                            <td className="border p-2 font-bold">{m.name}</td>
+                                            <td className="border p-2 text-right text-slate-500">{fmt(m.base)}</td>
+                                            <td className="border p-0 bg-white">
+                                                <input className="excel-input p-2"
+                                                    disabled={!isAdmin}
+                                                    defaultValue={m.intermediate !== null ? fmt(m.intermediate) : ''}
+                                                    onBlur={(e) => updateField(m.id, 'intermediate', e.target.value)}
+                                                    placeholder={isAdmin ? "-" : ""}
+                                                />
+                                            </td>
+                                            <td className="border p-0 bg-pink-50">
+                                                <input className="excel-input p-2 font-bold text-slate-900"
+                                                    disabled={!isAdmin}
+                                                    defaultValue={m.final !== null ? fmt(m.final) : ''}
+                                                    onBlur={(e) => updateField(m.id, 'final', e.target.value)}
+                                                    placeholder={isAdmin ? "-" : ""}
+                                                />
+                                            </td>
+                                            <td className="border p-2 text-right font-bold bg-blue-50 text-blue-800">
+                                                {diff > 0 ? `+${fmt(diff)}` : '0'}
+                                            </td>
+                                            <td className="border p-2">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {TIERS.filter(t => diffG >= t).map(t => (
+                                                        <span key={t} className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
+                                                            {t}G
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- COMPONENT: SESSION ROULETTE ---
+        const Roulette = ({ members, isAdmin }) => {
+            const [currentTierIdx, setCurrentTierIdx] = useState(0);
+            const [currentWinCount, setCurrentWinCount] = useState(0);
+            const [sessionResults, setSessionResults] = useState([]);
+            const [isSpinning, setIsSpinning] = useState(false);
+            const [tape, setTape] = useState([]);
+            const [winner, setWinner] = useState(null);
+            const [showModal, setShowModal] = useState(false);
+            
+            const tapeRef = useRef(null);
+            
+            const currentTier = TIERS[currentTierIdx];
+            const maxWins = TIER_COUNTS[currentTier];
+            const isFinished = currentTierIdx >= TIERS.length;
+
+            const CARD_WIDTH = 150;
+            const WIN_INDEX = 60;
+
+            const eligible = members.filter(m => getTierG(getDiff(m)) >= currentTier);
+
+            // Tape Init
+            useEffect(() => {
+                if(!isSpinning && eligible.length > 0) {
+                    const t = [];
+                    for(let i=0; i<WIN_INDEX+10; i++) t.push(eligible[i % eligible.length]);
+                    setTape(t);
+                }
+            }, [eligible.length, currentTier]);
+
+            const spin = () => {
+                if(isSpinning || eligible.length === 0 || isFinished) return;
+                
+                setIsSpinning(true);
+                setWinner(null);
+
+                // Weighted Random Logic
+                const totalDiff = eligible.reduce((sum, m) => sum + getDiff(m), 0);
+                let r = Math.random() * totalDiff;
+                let selected = eligible[0];
+                for (const m of eligible) {
+                    const d = getDiff(m);
+                    if (r < d) { selected = m; break; }
+                    r -= d;
+                }
+
+                // Build Tape
+                const newTape = [];
+                for(let i=0; i<WIN_INDEX+10; i++) {
+                    newTape.push(i === WIN_INDEX ? selected : eligible[Math.floor(Math.random()*eligible.length)]);
+                }
+                setTape(newTape);
+                setWinner(selected);
+
+                // Animation Reset
+                if(tapeRef.current) {
+                    tapeRef.current.style.transition = 'none';
+                    tapeRef.current.style.transform = 'translateX(0px)';
+                    tapeRef.current.offsetHeight; // Reflow
+                    
+                    const containerW = tapeRef.current.parentElement.offsetWidth;
+                    const center = containerW / 2;
+                    const target = (WIN_INDEX * CARD_WIDTH) + (CARD_WIDTH / 2);
+                    const final = center - target;
+
+                    setTimeout(() => {
+                        if(tapeRef.current) {
+                            tapeRef.current.style.transition = 'transform 8s cubic-bezier(0.1, 0, 0, 1)';
+                            tapeRef.current.style.transform = `translateX(${final}px)`;
+                        }
+                    }, 50);
+                }
+
+                // Finish
+                setTimeout(() => {
+                    setIsSpinning(false);
+                    const result = {
+                        tier: currentTier,
+                        name: selected.name,
+                        prize: TIER_PRIZES[currentTier],
+                        time: new Date().toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" })
+                    };
+                    setSessionResults(prev => [...prev, result]);
+                    
+                    // Logic to advance
+                    if (currentWinCount + 1 >= maxWins) {
+                        if (currentTierIdx + 1 < TIERS.length) {
+                            setCurrentWinCount(0);
+                            setCurrentTierIdx(prev => prev + 1);
+                        } else {
+                            // End of all tiers
+                            setTimeout(() => setShowModal(true), 1000);
+                        }
+                    } else {
+                        setCurrentWinCount(prev => prev + 1);
+                    }
+
+                }, 8500);
+            };
+
+            const saveSession = async () => {
+                const dateStr = new Date().toLocaleDateString("ru-RU");
+                await addDoc(collection(db, "history"), {
+                    date: dateStr,
+                    timestamp: Date.now(),
+                    results: sessionResults
+                });
+                alert("Сессия сохранена в Архив!");
+                setShowModal(false);
+            };
+
+            const copyDiscord = () => {
+                let txt = "🏆 **Итоги Розыгрыша:**\n";
+                sessionResults.forEach(r => {
+                    txt += `⏰ ${r.time} | ${r.tier}G: ${r.name.split('#')[0]} (Приз: ${r.prize}💎)\n`;
+                });
+                navigator.clipboard.writeText(txt).then(() => alert("Скопировано!"));
+            };
+
+            return (
+                <div className="flex flex-col gap-6">
+                    {/* Progress Header */}
+                    <div className="flex justify-between items-end bg-slate-800 p-4 rounded-xl border border-slate-700">
+                        <div>
+                            <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Текущий Этап</div>
+                            <div className="text-4xl font-black text-amber-500 drop-shadow-md leading-none">
+                                {currentTier}G 
+                                <span className="text-lg text-slate-500 ml-2 font-medium">
+                                    (Место {Math.min(currentWinCount + 1, maxWins)}/{maxWins})
+                                </span>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                             <div className="text-xs text-slate-400 uppercase mb-1">Приз Этапа</div>
+                             <div className="text-2xl font-bold text-white">{TIER_PRIZES[currentTier]} 💎</div>
+                        </div>
+                    </div>
+
+                    {/* CS:GO Roulette */}
+                    <div className="bg-slate-900 rounded-xl border-4 border-slate-800 shadow-2xl overflow-hidden relative h-48 flex items-center">
+                         <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-red-600 z-20 shadow-[0_0_15px_red] transform -translate-x-1/2"></div>
+                         <div ref={tapeRef} className="flex h-36 items-center pl-[50%]" style={{ willChange: 'transform' }}>
+                            {tape.map((m, i) => (
+                                <div key={i} className={`flex-shrink-0 w-[140px] h-[140px] mx-[5px] bg-slate-800 border-2 ${isSpinning && i === WIN_INDEX ? 'border-amber-500 z-10' : 'border-slate-600'} rounded-lg flex flex-col items-center justify-center p-2 relative shadow-lg`}>
+                                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-slate-400 mb-2">
+                                        {m.name[0]}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 truncate w-full text-center">{m.name}</div>
+                                    <div className="text-amber-500 font-bold text-sm mt-1">{getTierG(getDiff(m))}G</div>
+                                </div>
+                            ))}
+                         </div>
+                    </div>
+
+                    {/* Controls */}
+                    <div className="flex flex-col items-center justify-center gap-4">
+                        {winner && !isSpinning && (
+                            <div className="text-center animate-bounce">
+                                <div className="text-amber-500 uppercase text-xs font-bold tracking-widest">Победитель раунда</div>
+                                <div className="text-3xl font-black text-white">{winner.name}</div>
+                            </div>
+                        )}
+                        
+                        {isAdmin ? (
+                            <button onClick={spin} disabled={isSpinning || isFinished}
+                                className="px-16 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-900 font-black text-2xl uppercase tracking-[0.2em] rounded-full shadow-[0_0_30px_rgba(245,158,11,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition transform active:scale-95">
+                                {isSpinning ? 'КРУТИМ...' : isFinished ? 'СЕССИЯ ЗАВЕРШЕНА' : 'ЗАПУСТИТЬ РАУНД'}
+                            </button>
+                        ) : (
+                            <div className="text-slate-500 italic">Ожидайте запуска администратором...</div>
+                        )}
+                    </div>
+
+                    {/* Current Session Log */}
+                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                        <h3 className="text-slate-400 text-xs font-bold uppercase mb-3">Текущая Сессия</h3>
+                        <div className="space-y-2">
+                            {sessionResults.slice().reverse().map((r, i) => (
+                                <div key={i} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-slate-700/50">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-slate-500 font-mono text-xs">{r.time}</span>
+                                        <span className="bg-amber-500/20 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-bold">{r.tier}G</span>
+                                        <span className="text-white font-bold text-sm">{r.name}</span>
+                                    </div>
+                                    <div className="text-amber-400 font-mono text-xs">{r.prize} 💎</div>
+                                </div>
+                            ))}
+                            {sessionResults.length === 0 && <div className="text-center text-slate-600 text-sm">Пока нет победителей</div>}
+                        </div>
+                    </div>
+
+                    {/* End Session Modal */}
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full shadow-2xl relative">
+                                <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X size={20} /></button>
+                                <div className="text-center mb-6">
+                                    <Trophy size={48} className="mx-auto text-amber-500 mb-2" />
+                                    <h2 className="text-2xl font-black text-white uppercase">Итоги Сессии</h2>
+                                    <p className="text-slate-400 text-sm">Все тиры разыграны!</p>
+                                </div>
+                                <div className="bg-slate-950 rounded border border-slate-800 p-4 max-h-60 overflow-y-auto mb-6 custom-scrollbar">
+                                    {sessionResults.map((r, i) => (
+                                        <div key={i} className="flex justify-between text-sm py-1 border-b border-slate-800 last:border-0">
+                                            <span><span className="text-amber-500">{r.tier}G</span> {r.name}</span>
+                                            <span className="text-slate-400">{r.prize}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={copyDiscord} className="bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
+                                        <Copy size={16} /> Скопировать
+                                    </button>
+                                    <button onClick={saveSession} className="bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
+                                        <Save size={16} /> В Архив
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- COMPONENT: ARCHIVE ---
+        const ArchiveView = () => {
+            const [history, setHistory] = useState([]);
+            const [selected, setSelected] = useState(null);
+
+            useEffect(() => {
+                const q = query(collection(db, "history"), orderBy("timestamp", "desc"));
+                const unsub = onSnapshot(q, (snap) => {
+                    setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                });
+                return () => unsub();
+            }, []);
+
+            return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[600px]">
+                    <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden flex flex-col">
+                        <div className="p-4 bg-slate-900 font-bold text-slate-400 uppercase text-xs">Прошедшие Розыгрыши</div>
+                        <div className="overflow-y-auto flex-1 p-2 space-y-2 custom-scrollbar">
+                            {history.map(h => (
+                                <button key={h.id} onClick={() => setSelected(h)}
+                                    className={`w-full text-left p-3 rounded-lg border transition ${selected?.id === h.id ? 'bg-amber-500/10 border-amber-500/50 text-amber-500' : 'bg-slate-700/30 border-slate-700 text-slate-300 hover:bg-slate-700'}`}>
+                                    <div className="font-bold">{h.date}</div>
+                                    <div className="text-[10px] opacity-70">Победителей: {h.results?.length}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="md:col-span-2 bg-slate-800 rounded-xl border border-slate-700 p-6 overflow-hidden flex flex-col">
+                        {selected ? (
+                            <>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl font-bold text-white">Итоги от {selected.date}</h2>
+                                    <button onClick={() => {
+                                        let txt = `📜 **Архив от ${selected.date}:**\n`;
+                                        selected.results.forEach(r => txt += `${r.tier}G: ${r.name} (${r.prize})\n`);
+                                        navigator.clipboard.writeText(txt);
+                                        alert("Скопировано!");
+                                    }} className="text-slate-400 hover:text-white"><Copy size={18} /></button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
+                                    {selected.results.map((r, i) => (
+                                        <div key={i} className="flex items-center justify-between bg-slate-900 p-3 rounded border border-slate-700">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500">
+                                                    {i+1}
+                                                </div>
+                                                <div>
+                                                    <div className="text-white font-bold text-sm">{r.name}</div>
+                                                    <div className="text-xs text-amber-500">{r.tier}G Уровень</div>
+                                                </div>
+                                            </div>
+                                            <div className="text-slate-400 font-mono text-sm">{r.prize} 💎</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-slate-500 flex-col">
+                                <Archive size={48} className="mb-4 opacity-20" />
+                                <p>Выберите дату слева</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             );
         };
@@ -252,126 +522,78 @@
         const App = () => {
             const [members, setMembers] = useState([]);
             const [tab, setTab] = useState('table');
-            const [isAdmin, setIsAdmin] = useState(false);
-            const [pass, setPass] = useState('');
-            const [showLogin, setShowLogin] = useState(false);
-            const [aiRes, setAiRes] = useState('');
+            const [isAdmin, setIsAdmin] = useState(localStorage.getItem('isAdmin') === 'true');
 
-            // Data Listener
+            // Sync Users
             useEffect(() => {
-                if(!db) return;
-                const unsub = onSnapshot(collection(db, "members"), (snap) => {
-                    const list = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                    setMembers(list.sort((a,b) => b.investments - a.investments));
+                const q = query(collection(db, "users"), orderBy("base", "desc")); // Order by Base contribution
+                const unsub = onSnapshot(q, (snap) => {
+                    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setMembers(data);
                 });
                 return () => unsub();
             }, []);
 
-            const login = (e) => {
-                e.preventDefault();
-                if(pass === 'GM123') { setIsAdmin(true); setShowLogin(false); setPass(''); }
-                else alert('Неверно');
-            };
-
-            // !!! CRITICAL RESTORE FUNCTION !!!
-            const loadInitialData = async () => {
-                if(!db) return alert("Нет соединения с БД");
-                if(!confirm(`Перезаписать базу ${RESTORE_DATA.length} участниками?`)) return;
-
-                const batch = writeBatch(db);
-                // Удаляем старые (в демо просто перезапишем поверх ID)
-                // Для чистоты лучше удалять, но для стабильности просто добавим
-                
-                RESTORE_DATA.forEach((u, i) => {
-                    const id = (1000 + i).toString();
-                    const ref = doc(db, "members", id);
-                    const val = u.current * 1000000; // Convert to millions (G) logic
-                    batch.set(ref, {
-                        id: id,
-                        name: u.name,
-                        investments: val,
-                        startScore: 0,
-                        endScore: val, // Initially equal
-                        reward: ''
-                    });
-                });
-
-                try {
-                    await batch.commit();
-                    alert("Данные успешно восстановлены!");
-                } catch(e) {
-                    alert("Ошибка: " + e.message);
+            const toggleAdmin = () => {
+                if (isAdmin) {
+                    setIsAdmin(false);
+                    localStorage.setItem('isAdmin', 'false');
+                } else {
+                    const pwd = prompt("Введите пароль Администратора:");
+                    if (pwd === "GM123") {
+                        setIsAdmin(true);
+                        localStorage.setItem('isAdmin', 'true');
+                    } else {
+                        alert("Неверный пароль");
+                    }
                 }
-            };
-
-            const askAI = async () => {
-                setAiRes("Думаю...");
-                const txt = await analyzeGuildStats(members);
-                setAiRes(txt);
             };
 
             return (
                 <div className="min-h-screen pb-10">
                     {/* Header */}
-                    <nav className="bg-guild-800 p-4 border-b border-guild-700 flex justify-between items-center sticky top-0 z-50">
-                        <div className="font-bold text-xl flex items-center gap-2"><Shield className="text-guild-accent"/> GuildMaster</div>
-                        <div className="flex gap-4">
-                            <button onClick={()=>setTab('table')} className={`hover:text-white ${tab==='table'?'text-guild-accent':'text-gray-400'}`}>Таблица</button>
-                            <button onClick={()=>setTab('stats')} className={`hover:text-white ${tab==='stats'?'text-guild-accent':'text-gray-400'}`}>Статы</button>
-                            <button onClick={()=>setTab('lotto')} className={`hover:text-white ${tab==='lotto'?'text-guild-accent':'text-gray-400'}`}>Рулетка</button>
-                            {isAdmin ? 
-                                <button onClick={()=>setIsAdmin(false)} className="text-red-400"><LogOut size={20}/></button> : 
-                                <button onClick={()=>setShowLogin(true)} className="text-gray-400"><Lock size={20}/></button>
-                            }
-                        </div>
-                    </nav>
-
-                    {/* Content */}
-                    <main className="max-w-7xl mx-auto p-4 animate-fade-in">
-                        
-                        {/* Admin Panel */}
-                        {isAdmin && (
-                            <div className="mb-6 p-4 bg-red-900/20 border border-red-500 rounded flex justify-between items-center">
-                                <div className="text-red-200 font-bold flex gap-2"><Shield size={20}/> Режим Администратора</div>
-                                <button onClick={loadInitialData} className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded font-bold shadow flex gap-2 items-center">
-                                    <RefreshCw size={16}/> ВОССТАНОВИТЬ ДАННЫЕ
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Login Modal */}
-                        {showLogin && (
-                            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-                                <form onSubmit={login} className="bg-guild-800 p-6 rounded border border-guild-700 w-80">
-                                    <h3 className="text-lg font-bold mb-4">Вход GM</h3>
-                                    <input type="password" value={pass} onChange={e=>setPass(e.target.value)} className="w-full bg-guild-900 p-2 rounded border border-guild-700 mb-4" placeholder="Пароль" autoFocus />
-                                    <div className="flex justify-end gap-2">
-                                        <button type="button" onClick={()=>setShowLogin(false)} className="text-gray-400">Отмена</button>
-                                        <button type="submit" className="bg-guild-accent text-white px-4 py-1 rounded">Войти</button>
-                                    </div>
-                                </form>
-                            </div>
-                        )}
-
-                        {tab === 'table' && <GuildManager members={members} setMembers={setMembers} isAdmin={isAdmin} />}
-                        
-                        {tab === 'stats' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <StatsChart members={members} />
-                                <div className="bg-guild-800 p-6 rounded-xl border border-guild-700">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-bold text-lg">AI Аналитик</h3>
-                                        <button onClick={askAI} className="bg-indigo-600 px-3 py-1 rounded text-sm flex gap-2 items-center"><Sparkles size={14}/> Спросить</button>
-                                    </div>
-                                    <div className="text-sm text-gray-300 whitespace-pre-wrap h-64 overflow-y-auto custom-scrollbar bg-guild-900 p-4 rounded">
-                                        {aiRes || "Нажми кнопку, чтобы проанализировать эффективность гильдии."}
-                                    </div>
+                    <header className="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-40 shadow-lg">
+                        <div className="max-w-6xl mx-auto flex justify-between items-center relative">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-amber-500/20 p-2 rounded-lg">
+                                    <Trophy className="text-amber-500" size={24} />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-white tracking-wider uppercase">Guild Ionia</h1>
+                                    <p className="text-xs text-slate-400">Randomizer System</p>
                                 </div>
                             </div>
-                        )}
 
-                        {tab === 'lotto' && <Roulette participants={members.filter(m => (m.endScore || 0) > 100)} />}
+                            <MoscowClock />
 
+                            <div className="flex items-center gap-4">
+                                <button onClick={toggleAdmin} className={`p-2 rounded-full transition ${isAdmin ? 'bg-red-500/20 text-red-500' : 'bg-slate-800 text-slate-500 hover:text-slate-300'}`}>
+                                    {isAdmin ? <Unlock size={20} /> : <Lock size={20} />}
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Navigation */}
+                    <div className="max-w-6xl mx-auto mt-6 px-4">
+                        <div className="flex justify-center gap-2 bg-slate-800/50 p-1 rounded-xl w-fit mx-auto backdrop-blur-sm border border-slate-700/50">
+                            <button onClick={() => setTab('table')} className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition ${tab === 'table' ? 'bg-amber-500 text-slate-900 shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+                                <TableIcon size={16} /> Таблица
+                            </button>
+                            <button onClick={() => setTab('lottery')} className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition ${tab === 'lottery' ? 'bg-amber-500 text-slate-900 shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+                                <RefreshCw size={16} /> Розыгрыш
+                            </button>
+                            <button onClick={() => setTab('archive')} className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition ${tab === 'archive' ? 'bg-amber-500 text-slate-900 shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+                                <Archive size={16} /> Архив
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <main className="max-w-6xl mx-auto mt-8 px-4">
+                        {tab === 'table' && <ExcelTable members={members} isAdmin={isAdmin} />}
+                        {tab === 'lottery' && <Roulette members={members} isAdmin={isAdmin} />}
+                        {tab === 'archive' && <ArchiveView />}
                     </main>
                 </div>
             );
