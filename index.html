@@ -14,8 +14,8 @@
       "imports": {
         "react": "https://esm.sh/react@18.2.0",
         "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.344.0?external=react",
-        "canvas-confetti": "https://esm.sh/canvas-confetti@1.6.0",
+        "lucide-react": "https://esm.sh/lucide-react@0.344.0",
+        "canvas-confetti": "https://esm.sh/canvas-confetti@1.6.0?external=react,react-dom",
         "react-snowfall": "https://esm.sh/react-snowfall@2.1.0?external=react,react-dom",
         "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
         "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
@@ -65,6 +65,9 @@
     </script>
 
     <style>
+        /* CRITICAL: Ensure pixel-perfect height calculations */
+        *, *::before, *::after { box-sizing: border-box; }
+
         body { background-color: #0f172a; color: white; font-family: 'Segoe UI', sans-serif; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
@@ -147,7 +150,7 @@
             gap: 6px;
             flex-wrap: nowrap; 
             overflow-x: auto;  
-            max-width: 300px; /* INCREASED WIDTH FROM 180px */
+            max-width: 300px; 
             scrollbar-width: none; 
         }
         .cell-tiers::-webkit-scrollbar { display: none; }
@@ -185,7 +188,6 @@
         }
 
         /* --- LOTTERY PAGE STYLES --- */
-        /* 1. CTA BUTTON */
         .cta-button {
             background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%);
             border: none;
@@ -209,7 +211,6 @@
             opacity: 0.5;
         }
 
-        /* 2. WINNER EFFECT */
         .winner-name {
             font-size: 2.5rem;
             font-weight: 900;
@@ -224,12 +225,11 @@
             100% { opacity: 1; transform: scale(1); }
         }
 
-        /* 3. PARTICIPANT CARD */
         .participant-card {
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 6px;
-            margin-bottom: 8px;
+            margin-bottom: 4px; /* Reduced margin */
             transition: background 0.2s;
         }
         .participant-card:hover {
@@ -237,21 +237,25 @@
             border-color: rgba(255, 255, 255, 0.2);
         }
 
-        /* CHANCE BADGE */
         .chance-badge {
             color: #a0aec0;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             font-family: 'Roboto Mono', monospace;
             background: rgba(0, 0, 0, 0.2);
             padding: 2px 6px;
             border-radius: 4px;
         }
 
-        /* 4. HISTORY ITEM */
         .history-item {
             border-left: 3px solid #ed8936;
             background: linear-gradient(90deg, rgba(237, 137, 54, 0.1) 0%, rgba(0,0,0,0) 100%);
             margin-bottom: 6px;
+        }
+        
+        /* ROULETTE MASK (FOG EFFECT) - Updated for sharper focus */
+        .roulette-mask {
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%);
         }
 
         /* --- CHANGELOG STYLES --- */
@@ -321,7 +325,7 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { Lock, Unlock, Trophy, Archive, Table as TableIcon, Upload, Save, Copy, X, Calendar, ChevronDown, ChevronUp, Trash2, UserPlus, Eye, ShieldAlert, History, Bell, PartyPopper, RefreshCw, Megaphone, Volume2, VolumeX, Download } from 'lucide-react';
+        import { Lock, Unlock, Trophy, Archive, Table as TableIcon, Upload, Save, Copy, X, Calendar, ChevronDown, ChevronUp, Trash2, UserPlus, Eye, ShieldAlert, History, Bell, PartyPopper, RefreshCw, Megaphone, Volume2, VolumeX, Download, Info, CheckCircle2, Wrench } from 'lucide-react';
         import confetti from 'canvas-confetti';
         import Snowfall from 'react-snowfall';
         
@@ -378,8 +382,8 @@
         // --- SOUND ASSETS ---
         const AUDIO_URLS = {
             click: "https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3",
-            spin: "https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3", // Ticking
-            win: "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3"  // Fanfare
+            spin: "https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3",
+            win: "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3"
         };
 
         // --- UTILS ---
@@ -390,109 +394,65 @@
             return diff < 0 ? 0 : diff;
         };
         const getTierG = (diff) => Math.floor(diff / 1_000_000_000);
+        
+        // Format timestamp with millis
+        const fmtTimeFull = (ts) => {
+            const date = new Date(ts);
+            return date.toLocaleTimeString("ru-RU", { hour12: false, timeZone: "Europe/Moscow" }) + '.' + date.getMilliseconds().toString().padStart(3, '0');
+        };
 
-        // --- COMPONENT: COUNTDOWN TIMER ---
+        // --- COMPONENTS ---
         const CountdownTimer = () => {
             const [timeLeft, setTimeLeft] = useState(null);
-
             useEffect(() => {
                 const targetDate = new Date("2026-01-01T21:00:00+03:00").getTime();
-
                 const calculate = () => {
                     const now = new Date().getTime();
                     const distance = targetDate - now;
-
-                    if (distance < 0) {
-                        setTimeLeft(null); 
-                        return;
-                    }
-
+                    if (distance < 0) { setTimeLeft(null); return; }
                     const days = Math.floor(distance / (1000 * 60 * 60 * 24));
                     const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                     const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
                     const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
                     setTimeLeft({ days, hours, minutes, seconds });
                 };
-
                 calculate();
                 const interval = setInterval(calculate, 1000);
                 return () => clearInterval(interval);
             }, []);
-
-            if (!timeLeft) return (
-                <div className="timer-container">
-                    <div className="text-2xl font-black text-amber-500 animate-pulse">РОЗЫГРЫШ НАЧАЛСЯ!</div>
-                </div>
-            );
-
+            if (!timeLeft) return <div className="timer-container"><div className="text-2xl font-black text-amber-500 animate-pulse">РОЗЫГРЫШ НАЧАЛСЯ!</div></div>;
             const format = (n) => n < 10 ? `0${n}` : n;
-
             return (
                 <div className="timer-container animate-in fade-in slide-in-from-top-4 duration-700">
-                    <div className="time-block">
-                        <div className="time-value">{format(timeLeft.days)}</div>
-                        <div className="time-label">ДН</div>
-                    </div>
+                    <div className="time-block"><div className="time-value">{format(timeLeft.days)}</div><div className="time-label">ДН</div></div>
                     <div className="text-2xl text-slate-600 font-bold self-start mt-2">:</div>
-                    <div className="time-block">
-                        <div className="time-value">{format(timeLeft.hours)}</div>
-                        <div className="time-label">ЧАС</div>
-                    </div>
+                    <div className="time-block"><div className="time-value">{format(timeLeft.hours)}</div><div className="time-label">ЧАС</div></div>
                     <div className="text-2xl text-slate-600 font-bold self-start mt-2">:</div>
-                    <div className="time-block">
-                        <div className="time-value">{format(timeLeft.minutes)}</div>
-                        <div className="time-label">МИН</div>
-                    </div>
+                    <div className="time-block"><div className="time-value">{format(timeLeft.minutes)}</div><div className="time-label">МИН</div></div>
                     <div className="text-2xl text-slate-600 font-bold self-start mt-2">:</div>
-                    <div className="time-block">
-                        <div className="time-value">{format(timeLeft.seconds)}</div>
-                        <div className="time-label">СЕК</div>
-                    </div>
+                    <div className="time-block"><div className="time-value">{format(timeLeft.seconds)}</div><div className="time-label">СЕК</div></div>
                 </div>
             );
         };
-
-        // --- COMPONENT: TOAST NOTIFICATIONS ---
         const ToastContainer = ({ toasts, removeToast }) => {
             return (
                 <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
                     {toasts.map(toast => (
-                        <div key={toast.id} className={`
-                            flex items-center gap-3 p-4 rounded-lg shadow-2xl border-l-4 min-w-[300px] animate-slide-in pointer-events-auto
-                            ${toast.type === 'win' ? 'bg-slate-800 border-amber-500' : 'bg-slate-800 border-blue-500'}
-                        `}>
-                            <div className={`p-2 rounded-full ${toast.type === 'win' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'}`}>
-                                {toast.type === 'win' ? <Trophy size={20} /> : <Bell size={20} />}
-                            </div>
-                            <div>
-                                <h4 className={`font-bold text-sm ${toast.type === 'win' ? 'text-amber-500' : 'text-blue-400'}`}>
-                                    {toast.title}
-                                </h4>
-                                <p className="text-white text-sm">{toast.message}</p>
-                            </div>
-                            <button onClick={() => removeToast(toast.id)} className="ml-auto text-slate-500 hover:text-white">
-                                <X size={16} />
-                            </button>
+                        <div key={toast.id} className={`flex items-center gap-3 p-4 rounded-lg shadow-2xl border-l-4 min-w-[300px] animate-slide-in pointer-events-auto ${toast.type === 'win' ? 'bg-slate-800 border-amber-500' : (toast.type === 'error' ? 'bg-slate-800 border-red-500' : 'bg-slate-800 border-blue-500')}`}>
+                            <div className={`p-2 rounded-full ${toast.type === 'win' ? 'bg-amber-500/10 text-amber-500' : (toast.type === 'error' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500')}`}>{toast.type === 'win' ? <Trophy size={20} /> : (toast.type === 'error' ? <ShieldAlert size={20}/> : <Bell size={20} />)}</div>
+                            <div><h4 className={`font-bold text-sm ${toast.type === 'win' ? 'text-amber-500' : (toast.type === 'error' ? 'text-red-400' : 'text-blue-400')}`}>{toast.title}</h4><p className="text-white text-sm">{toast.message}</p></div>
+                            <button onClick={() => removeToast(toast.id)} className="ml-auto text-slate-500 hover:text-white"><X size={16} /></button>
                         </div>
                     ))}
                 </div>
             );
         };
-
-        // --- COMPONENT: WINNER OVERLAY ---
         const WinnerOverlay = ({ winner, onClose, role }) => {
             useEffect(() => {
                 if(winner) {
                     const count = 200;
                     const defaults = { origin: { y: 0.7 } };
-                    
-                    function fire(particleRatio, opts) {
-                      confetti(Object.assign({}, defaults, opts, {
-                        particleCount: Math.floor(count * particleRatio)
-                      }));
-                    }
-                    
+                    function fire(particleRatio, opts) { confetti(Object.assign({}, defaults, opts, { particleCount: Math.floor(count * particleRatio) })); }
                     fire(0.25, { spread: 26, startVelocity: 55 });
                     fire(0.2, { spread: 60 });
                     fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
@@ -500,182 +460,144 @@
                     fire(0.1, { spread: 120, startVelocity: 45 });
                 }
             }, [winner]);
-
             if (!winner) return null;
             return (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300" onClick={onClose}>
                     <div className="bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-amber-500 rounded-2xl p-8 max-w-md w-full text-center shadow-[0_0_50px_rgba(245,158,11,0.5)] transform scale-100 animate-zoom-in" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-center mb-6">
-                             <div className="bg-amber-500/20 p-6 rounded-full ring-4 ring-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.4)]">
-                                <Trophy size={64} className="text-amber-500 drop-shadow-lg" />
-                             </div>
-                        </div>
+                        <div className="flex justify-center mb-6"><div className="bg-amber-500/20 p-6 rounded-full ring-4 ring-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.4)]"><Trophy size={64} className="text-amber-500 drop-shadow-lg" /></div></div>
                         <h2 className="text-3xl font-black text-white uppercase tracking-widest mb-2 drop-shadow-md">ПОБЕДА!</h2>
                         <div className="text-amber-500 text-lg font-bold mb-6 uppercase tracking-wide border-b border-amber-500/30 pb-4 mx-10">{winner.tier}G РАУНД</div>
-                        
                         <div className="bg-slate-950/50 rounded-xl p-6 mb-8 border border-slate-700 shadow-inner">
                             <div className="text-3xl md:text-4xl font-black text-white mb-2 drop-shadow-md truncate">{winner.name}</div>
-                            <div className="text-2xl font-mono text-amber-400 font-bold drop-shadow flex justify-center items-center gap-2">
-                                <PartyPopper size={24}/> +{winner.prize} 💎
-                            </div>
+                            <div className="text-2xl font-mono text-amber-400 font-bold drop-shadow flex justify-center items-center gap-2"><PartyPopper size={24}/> +{winner.prize} 💎</div>
                         </div>
-                        
-                        <button onClick={onClose} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 font-black text-xl uppercase rounded-xl transition shadow-lg transform active:scale-95">
-                            {(role === 'ADMIN' || role === 'TESTER') ? 'ПРОДОЛЖИТЬ (ЗАКРЫТЬ У ВСЕХ)' : 'ЗАКРЫТЬ'}
-                        </button>
+                        <button onClick={onClose} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 font-black text-xl uppercase rounded-xl transition shadow-lg transform active:scale-95">{(role === 'ADMIN' || role === 'TESTER') ? 'ПРОДОЛЖИТЬ (ЗАКРЫТЬ У ВСЕХ)' : 'ЗАКРЫТЬ'}</button>
                     </div>
                 </div>
             )
         };
-
-        // --- COMPONENT: LOGIN MODAL ---
         const LoginModal = ({ isOpen, onClose, onLogin }) => {
             if (!isOpen) return null;
             const [password, setPassword] = useState("");
             const [error, setError] = useState("");
-
             const handleSubmit = (e) => {
-                e.preventDefault();
-                setError("");
-                
-                if (password === "GM123") {
-                    onLogin("ADMIN");
-                    setPassword("");
-                } else if (password === "TESTER") {
-                    onLogin("TESTER");
-                    setPassword("");
-                } else {
-                    setError("Неверный пароль");
-                }
+                e.preventDefault(); setError("");
+                if (password === "GM123") { onLogin("ADMIN"); setPassword(""); } else if (password === "TESTER") { onLogin("TESTER"); setPassword(""); } else { setError("Неверный пароль"); }
             };
-
             return (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
                     <form onSubmit={handleSubmit} className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative">
-                        <button type="button" onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white transition">
-                            <X size={20} />
-                        </button>
-                        
-                        <div className="flex flex-col items-center mb-6">
-                            <div className="bg-amber-500/10 p-3 rounded-full mb-3">
-                                <Lock className="text-amber-500" size={32} />
-                            </div>
-                            <h3 className="text-xl font-bold text-white uppercase tracking-wide">Вход в систему</h3>
-                        </div>
-
+                        <button type="button" onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white transition"><X size={20} /></button>
+                        <div className="flex flex-col items-center mb-6"><div className="bg-amber-500/10 p-3 rounded-full mb-3"><Lock className="text-amber-500" size={32} /></div><h3 className="text-xl font-bold text-white uppercase tracking-wide">Вход в систему</h3></div>
                         <div className="space-y-4">
-                            <div>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500 transition"
-                                    placeholder="Пароль..."
-                                    autoFocus
-                                />
-                                {error && <p className="text-red-500 text-xs mt-2 font-bold flex items-center gap-1"><ShieldAlert size={12}/> {error}</p>}
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-3">
-                                <button type="button" onClick={onClose} className="px-4 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-lg transition">
-                                    Отмена
-                                </button>
-                                <button type="submit" className="px-4 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-900 font-bold rounded-lg shadow-lg transition transform active:scale-95">
-                                    Войти
-                                </button>
-                            </div>
+                            <div><input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500 transition" placeholder="Пароль..." autoFocus />{error && <p className="text-red-500 text-xs mt-2 font-bold flex items-center gap-1"><ShieldAlert size={12}/> {error}</p>}</div>
+                            <div className="grid grid-cols-2 gap-3"><button type="button" onClick={onClose} className="px-4 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-lg transition">Отмена</button><button type="submit" className="px-4 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-900 font-bold rounded-lg shadow-lg transition transform active:scale-95">Войти</button></div>
                         </div>
                     </form>
                 </div>
             );
         };
-
-        // --- COMPONENT: MOSCOW CLOCK ---
         const MoscowClock = () => {
             const [dt, setDt] = useState({ date: "", time: "" });
             useEffect(() => {
                 const tick = () => {
                     const now = new Date();
-                    setDt({
-                        date: now.toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" }),
-                        time: now.toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" })
-                    });
+                    setDt({ date: now.toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" }), time: now.toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" }) });
                 };
-                tick();
-                const int = setInterval(tick, 1000);
-                return () => clearInterval(int);
+                tick(); const int = setInterval(tick, 1000); return () => clearInterval(int);
             }, []);
-            
             return (
                 <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-30 pointer-events-none select-none">
-                     <div className="flex items-center gap-2 text-amber-200 text-sm font-bold uppercase tracking-widest drop-shadow-md">
-                        <Calendar size={14} />
-                        {dt.date}
-                     </div>
-                    <div className="text-4xl font-black text-amber-500 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-mono leading-none mt-1">
-                        {dt.time}
-                    </div>
+                     <div className="flex items-center gap-2 text-amber-200 text-sm font-bold uppercase tracking-widest drop-shadow-md"><Calendar size={14} />{dt.date}</div>
+                    <div className="text-4xl font-black text-amber-500 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-mono leading-none mt-1">{dt.time}</div>
                     <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Москва (UTC+3)</div>
                 </div>
             );
         };
-
-        // --- COMPONENT: CHANGELOG VIEW ---
-        const ChangelogView = () => {
-            return (
-                <div className="changelog-container">
-                    <h2 className="text-2xl font-bold mb-6 text-white uppercase tracking-wider text-center">История Обновлений</h2>
-                    <div className="version-card">
-                      <h3 className="version-title font-black">v0.2 — The Fairness & FX Update <span className="text-xs text-slate-500 float-right mt-2">24.11.2024</span></h3>
-                      <ul className="change-list text-sm text-slate-300 list-disc pl-5">
-                          <li><span className="category-badge">⚖️ Баланс:</span> Полный переход на систему <strong>Равных Шансов</strong>. Вклад влияет только на допуск к тиру, но не на вероятность победы.</li>
-                          <li><span className="category-badge">🎰 Рулетка 2.0:</span> Новый дизайн "Вертикальный Слот". Победитель остается в игре и может выигрывать многократно (Winner Retention).</li>
-                          <li><span className="category-badge">🔄 Синхронизация:</span> Мгновенная запись в Архив после каждого спина. Синхронное закрытие окна победы админом для всех зрителей.</li>
-                          <li><span className="category-badge">🎨 Визуал & FX:</span> Новогодний снегопад, Конфетти, Звуковые эффекты, Озвучка победителя (TTS).</li>
-                          <li><span className="category-badge">🛠️ Системное:</span> Темная тема таблицы, Модальное окно входа (fix зависаний), Система бэкапов (JSON Import/Export).</li>
-                      </ul>
-                    </div>
-                    <div className="version-card">
-                      <h3 className="version-title font-black">v0.1 — Global Update</h3>
-                      <ul className="change-list text-sm text-slate-300 list-disc pl-5">
-                         <li><span className="category-badge">⚡ Основное:</span> Добавлено сохранение сессии (localStorage) — прогресс не теряется при F5. Синхронизировано закрытие окна победителя у всех зрителей.</li>
-                         <li><span className="category-badge">📊 Таблица:</span> Полный редизайн (Dark Mode), улучшена читаемость цифр (моноширинный шрифт), авто-сортировка лидеров.</li>
-                         <li><span className="category-badge">🎰 Рулетка:</span> Добавлены эффекты свечения победителя, новая кнопка запуска, анимация появления.</li>
-                         <li><span className="category-badge">📦 Архив:</span> Запись игр в реальном времени (защита от сбоев), скрытие пустых слотов, сортировка (новые сверху).</li>
-                      </ul>
-                    </div>
+        const ChangelogView = () => (
+            <div className="changelog-container">
+                <h2 className="text-2xl font-bold mb-6 text-white uppercase tracking-wider text-center">История Обновлений</h2>
+                
+                <div className="version-card">
+                     <h3 className="version-title font-black">v0.3 — UI Polish & Logic <span className="text-xs text-slate-500 float-right mt-2">26.11.2024</span></h3>
+                     <ul className="change-list text-sm text-slate-300 list-disc pl-5">
+                        <li><span className="category-badge">🎯 Рулетка:</span> Эффект "Тумана" (Focus Mask) для концентрации на победителе.</li>
+                        <li><span className="category-badge">👥 Интерфейс:</span> Сетка участников (Grid View) для компактности.</li>
+                        <li><span className="category-badge">🔄 Логика:</span> Исправлена кнопка Сброс (полный перезапуск без перезагрузки страницы).</li>
+                        <li><span className="category-badge">🛠️ Debug:</span> Добавлена кнопка проверки пула участников перед запуском.</li>
+                     </ul>
                 </div>
-            );
-        };
 
-        // --- COMPONENT: LOGS VIEW ---
+                <div className="version-card">
+                    <h3 className="version-title font-black">v0.2 — The Fairness Update <span className="text-xs text-slate-500 float-right mt-2">24.11.2024</span></h3>
+                    <ul className="change-list text-sm text-slate-300 list-disc pl-5">
+                        <li><span className="category-badge">⚖️ Баланс:</span> Полный переход на систему <strong>Равных Шансов</strong>. Вклад влияет только на допуск к тиру.</li>
+                        <li><span className="category-badge">🎰 Рулетка 2.0:</span> Новый дизайн "Вертикальный Слот". Победитель может выигрывать многократно.</li>
+                        <li><span className="category-badge">🔄 Синхронизация:</span> Мгновенная запись в Архив. Синхронное закрытие окон.</li>
+                    </ul>
+                </div>
+            </div>
+        );
+
         const LogsView = ({ logs }) => {
+            const [expandedId, setExpandedId] = useState(null);
+            
+            const getTypeStyle = (type) => {
+                switch(type) {
+                    case 'WIN': return 'text-green-400 border-l-4 border-green-500 pl-2';
+                    case 'ERROR': return 'text-red-400 border-l-4 border-red-500 pl-2';
+                    case 'SYSTEM': return 'text-blue-400 border-l-4 border-blue-500 pl-2';
+                    default: return 'text-slate-300 border-l-4 border-slate-600 pl-2';
+                }
+            };
+
+            const toggle = (id) => setExpandedId(expandedId === id ? null : id);
+
             return (
                 <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-xl">
                     <div className="p-4 bg-slate-900 border-b border-slate-700 flex items-center gap-2">
-                         <History className="text-amber-500" size={20} />
-                         <h3 className="font-bold text-slate-200 uppercase tracking-wide">Журнал Аудита</h3>
+                        <History className="text-amber-500" size={20} />
+                        <h3 className="font-bold text-slate-200 uppercase tracking-wide">Журнал Аудита</h3>
                     </div>
                     <div className="overflow-x-auto max-h-[600px]">
                         <table className="w-full text-sm text-left">
                             <thead className="text-xs text-slate-400 uppercase bg-slate-900/50">
                                 <tr>
-                                    <th className="px-4 py-3">Время (МСК)</th>
-                                    <th className="px-4 py-3">Роль</th>
-                                    <th className="px-4 py-3">Действие</th>
+                                    <th className="px-4 py-3 w-40">Время</th>
+                                    <th className="px-4 py-3 w-24">Роль</th>
+                                    <th className="px-4 py-3">Событие</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-700 font-mono">
                                 {logs.map((log) => {
-                                    const date = new Date(log.timestamp);
-                                    const timeStr = date.toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" });
-                                    const roleColor = log.role === 'ADMIN' ? 'text-red-400' : 'text-blue-400';
+                                    const roleColor = log.role === 'ADMIN' ? 'text-red-400 font-bold' : (log.role === 'TESTER' ? 'text-blue-400 font-bold' : 'text-slate-500');
+                                    const typeClass = getTypeStyle(log.type || 'INFO');
+                                    
                                     return (
-                                        <tr key={log.id} className="bg-slate-800 hover:bg-slate-750">
-                                            <td className="px-4 py-2 text-slate-500 whitespace-nowrap">{timeStr}</td>
-                                            <td className={`px-4 py-2 font-bold ${roleColor}`}>{log.role}</td>
-                                            <td className="px-4 py-2 text-slate-300">{log.text}</td>
-                                        </tr>
+                                        <React.Fragment key={log.id}>
+                                            <tr className="bg-slate-800 hover:bg-slate-750 cursor-pointer transition-colors" onClick={() => toggle(log.id)}>
+                                                <td className="px-4 py-2 text-slate-500 whitespace-nowrap text-xs">
+                                                    {fmtTimeFull(log.timestamp)}
+                                                </td>
+                                                <td className={`px-4 py-2 ${roleColor}`}>{log.role}</td>
+                                                <td className="px-4 py-2">
+                                                    <div className={`flex items-center gap-2 ${typeClass}`}>
+                                                        {log.meta ? (expandedId === log.id ? <ChevronUp size={14}/> : <ChevronDown size={14}/>) : <span className="w-[14px]"></span>}
+                                                        {log.text}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {expandedId === log.id && log.meta && (
+                                                <tr className="bg-slate-900/50">
+                                                    <td colSpan="3" className="px-8 py-3">
+                                                        <div className="bg-slate-950 p-3 rounded border border-slate-800 text-xs font-mono text-green-300">
+                                                            <div className="mb-1 text-slate-500 uppercase font-bold">Metadata Payload:</div>
+                                                            <pre className="whitespace-pre-wrap">{JSON.stringify(log.meta, null, 2)}</pre>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
                                     );
                                 })}
                             </tbody>
@@ -684,603 +606,369 @@
                 </div>
             );
         };
-
-        // --- COMPONENT: ARCHIVE VIEW ---
         const ArchiveView = ({ archives }) => {
             const [expandedId, setExpandedId] = useState(null);
             const toggle = (id) => setExpandedId(expandedId === id ? null : id);
-
             if (archives.length === 0) return <div className="p-10 text-center text-slate-500">Архив пуст</div>;
-
             return (
                 <div className="max-w-4xl mx-auto space-y-4">
                     {archives.map(arch => (
                         <div key={arch.id} className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-                            <div onClick={() => toggle(arch.id)} className="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-700 transition">
-                                <div className="flex items-center gap-4">
-                                    <Archive className="text-amber-500" size={20} />
-                                    <div>
-                                        <div className="font-bold text-white">{arch.date}</div>
-                                        <div className="text-xs text-slate-400">Победителей: {arch.results?.length || 0}</div>
-                                    </div>
-                                </div>
-                                {expandedId === arch.id ? <ChevronUp /> : <ChevronDown />}
-                            </div>
-                            {expandedId === arch.id && (
-                                <div className="bg-slate-900 p-4 border-t border-slate-700">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        {arch.results?.map((res, idx) => (
-                                            <div key={idx} className="flex justify-between items-center p-2 bg-slate-800 rounded border border-slate-700">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1 rounded border border-amber-500/20">{res.tier}G</span>
-                                                    <span className="text-sm font-bold text-slate-200">{res.name}</span>
-                                                </div>
-                                                <span className="text-xs font-mono text-amber-400">{res.prize} 💎</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                            <div onClick={() => toggle(arch.id)} className="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-700 transition"><div className="flex items-center gap-4"><Archive className="text-amber-500" size={20} /><div><div className="font-bold text-white">{arch.date}</div><div className="text-xs text-slate-400">Победителей: {arch.results?.length || 0}</div></div></div>{expandedId === arch.id ? <ChevronUp /> : <ChevronDown />}</div>
+                            {expandedId === arch.id && (<div className="bg-slate-900 p-4 border-t border-slate-700"><div className="grid grid-cols-1 md:grid-cols-2 gap-2">{arch.results?.map((res, idx) => (<div key={idx} className="flex justify-between items-center p-2 bg-slate-800 rounded border border-slate-700"><div className="flex items-center gap-2"><span className="bg-amber-500/10 text-amber-500 text-[10px] px-1 rounded border border-amber-500/20">{res.tier}G</span><span className="text-sm font-bold text-slate-200">{res.name}</span></div><span className="text-xs font-mono text-amber-400">{res.prize} 💎</span></div>))}</div></div>)}
                         </div>
                     ))}
                 </div>
             );
         };
-
-        // --- COMPONENT: EXCEL TABLE (DARK THEME) ---
         const ExcelTable = ({ members, role, fullData, logAction }) => {
             const isEditable = role === 'ADMIN' || role === 'TESTER';
-
-            // Sorting: Descending by Final > Intermediate > Base
-            const sortedMembers = [...members].sort((a, b) => {
-                const getVal = (m) => m.final !== null ? m.final : (m.intermediate !== null ? m.intermediate : m.base);
-                return getVal(b) - getVal(a);
-            });
-
-            const updateField = async (id, field, value) => {
-                if (!isEditable) return;
-                const num = value === '' ? null : Number(value.replace(/\s/g, ''));
-                if (isNaN(num)) return;
-                
-                const currentMember = fullData.find(m => m.id === id);
-                await setDoc(doc(db, "users", id), { ...currentMember, [field]: num }, { merge: true });
-                await logAction(`Изменил ${currentMember.name}: ${field === 'final' ? 'Итог' : 'Промеж.'} -> ${fmt(num)}`);
-            };
-
-            const forceUpload = async () => {
-                if (!isEditable || !confirm("ВНИМАНИЕ: Это перезапишет базу данных. Продолжить?")) return;
-                for (const u of DEMO_DATA) {
-                    await setDoc(doc(db, "users", u.id), u);
-                }
-                await logAction("Восстановил Демо-данные");
-            };
-
-            const addMember = async () => {
-                if (!isEditable) return;
-                const name = prompt("Никнейм:");
-                if (!name) return;
-                const base = Number(prompt("Базовое вложение:", "0"));
-                if (isNaN(base)) return;
-                const newId = String(Date.now());
-                await setDoc(doc(db, "users", newId), { id: newId, name, base, intermediate: null, final: null });
-                await logAction(`Добавил участника: ${name}`);
-            };
-
-            const removeMember = async (m) => {
-                if (!isEditable || !confirm(`Удалить ${m.name}?`)) return;
-                await deleteDoc(doc(db, "users", m.id));
-                await logAction(`Удалил участника: ${m.name}`);
-            };
-
+            const sortedMembers = [...members].sort((a, b) => { const getVal = (m) => m.final !== null ? m.final : (m.intermediate !== null ? m.intermediate : m.base); return getVal(b) - getVal(a); });
+            const updateField = async (id, field, value) => { if (!isEditable) return; const num = value === '' ? null : Number(value.replace(/\s/g, '')); if (isNaN(num)) return; const currentMember = fullData.find(m => m.id === id); await setDoc(doc(db, "users", id), { ...currentMember, [field]: num }, { merge: true }); await logAction(`Изменил ${currentMember.name}: ${field === 'final' ? 'Итог' : 'Промеж.'} -> ${fmt(num)}`, 'INFO'); };
+            const forceUpload = async () => { if (!isEditable || !confirm("ВНИМАНИЕ: Это перезапишет базу данных. Продолжить?")) return; for (const u of DEMO_DATA) { await setDoc(doc(db, "users", u.id), u); } await logAction("Восстановил Демо-данные", 'SYSTEM'); };
+            const addMember = async () => { if (!isEditable) return; const name = prompt("Никнейм:"); if (!name) return; const base = Number(prompt("Базовое вложение:", "0")); if (isNaN(base)) return; const newId = String(Date.now()); await setDoc(doc(db, "users", newId), { id: newId, name, base, intermediate: null, final: null }); await logAction(`Добавил участника: ${name}`, 'SYSTEM'); };
+            const removeMember = async (m) => { if (!isEditable || !confirm(`Удалить ${m.name}?`)) return; await deleteDoc(doc(db, "users", m.id)); await logAction(`Удалил участника: ${m.name}`, 'SYSTEM'); };
             return (
                 <div className="bg-slate-900 rounded-lg shadow-xl overflow-hidden border border-slate-700">
-                    <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
-                        <h2 className="font-bold text-lg text-slate-300 uppercase tracking-wider">Таблица Вкладов</h2>
-                        <div className="flex gap-2">
-                            {isEditable && <button onClick={addMember} className="bg-green-900/30 text-green-400 px-3 py-1 rounded text-xs font-bold border border-green-800 hover:bg-green-900/50">Добавить</button>}
-                            {isEditable && <button onClick={forceUpload} className="bg-slate-700 text-slate-400 px-3 py-1 rounded text-xs hover:bg-slate-600">Демо</button>}
-                        </div>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="dark-theme-table">
-                            <thead>
-                                <tr>
-                                    <th className="w-10 text-center">#</th>
-                                    <th>Никнейм</th>
-                                    <th className="text-right">База (15.11)</th>
-                                    <th className="text-right header-highlight">Итоговый (01.01)</th>
-                                    <th className="text-right">Разница</th>
-                                    <th>Тиры</th>
-                                    {isEditable && <th style={{width: '40px'}}></th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sortedMembers.map((m, idx) => {
-                                    const diff = getDiff(m);
-                                    const diffG = getTierG(diff);
-                                    return (
-                                        <tr key={m.id}>
-                                            <td className="text-center text-slate-500">{idx+1}</td>
-                                            <td className="font-bold text-white">{m.name}</td>
-                                            <td className="col-number text-slate-400">{fmt(m.base)}</td>
-                                            <td className="p-0">
-                                                <input 
-                                                    className="dark-input" 
-                                                    disabled={!isEditable} 
-                                                    defaultValue={m.final ? fmt(m.final) : ''} 
-                                                    onBlur={(e) => updateField(m.id, 'final', e.target.value)} 
-                                                    placeholder="-"
-                                                />
-                                            </td>
-                                            <td className="col-number col-diff">{diff > 0 ? `+${fmt(diff)}` : '0'}</td>
-                                            <td>
-                                                <div className="cell-tiers">
-                                                    {TIERS.filter(t => diffG >= t).map(t => (
-                                                        <span key={t} className="tier-badge">{t}G</span>
-                                                    ))}
-                                                </div>
-                                            </td>
-                                            {isEditable && (
-                                                <td className="text-center cursor-pointer text-red-400 hover:text-red-300 transition" onClick={() => removeMember(m)}>
-                                                    <Trash2 size={16} />
-                                                </td>
-                                            )}
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                    <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center"><h2 className="font-bold text-lg text-slate-300 uppercase tracking-wider">Таблица Вкладов</h2><div className="flex gap-2">{isEditable && <button onClick={addMember} className="bg-green-900/30 text-green-400 px-3 py-1 rounded text-xs font-bold border border-green-800 hover:bg-green-900/50">Добавить</button>}{isEditable && <button onClick={forceUpload} className="bg-slate-700 text-slate-400 px-3 py-1 rounded text-xs hover:bg-slate-600">Демо</button>}</div></div>
+                    <div className="overflow-x-auto"><table className="dark-theme-table"><thead><tr><th className="w-10 text-center">#</th><th>Никнейм</th><th className="text-right">База (15.11)</th><th className="text-right header-highlight">Итоговый (01.01)</th><th className="text-right">Разница</th><th>Тиры</th>{isEditable && <th style={{width: '40px'}}></th>}</tr></thead><tbody>{sortedMembers.map((m, idx) => { const diff = getDiff(m); const diffG = getTierG(diff); return (<tr key={m.id}><td className="text-center text-slate-500">{idx+1}</td><td className="font-bold text-white">{m.name}</td><td className="col-number text-slate-400">{fmt(m.base)}</td><td className="p-0"><input className="dark-input" disabled={!isEditable} defaultValue={m.final ? fmt(m.final) : ''} onBlur={(e) => updateField(m.id, 'final', e.target.value)} placeholder="-" /></td><td className="col-number col-diff">{diff > 0 ? `+${fmt(diff)}` : '0'}</td><td><div className="cell-tiers">{TIERS.filter(t => diffG >= t).map(t => (<span key={t} className="tier-badge">{t}G</span>))}</div></td>{isEditable && (<td className="text-center cursor-pointer text-red-400 hover:text-red-300 transition" onClick={() => removeMember(m)}><Trash2 size={16} /></td>)}</tr>); })}</tbody></table></div>
                 </div>
             );
         };
 
         // --- COMPONENT: VERTICAL SLOT ROULETTE ---
-        const VerticalRoulette = ({ members, role, logAction, addToast, archives, updateArchive, playSound, speak, isMuted }) => {
+        const VerticalRoulette = ({ members, role, logAction, addToast, archives, updateArchive, onSessionReset, playSound, speak, isMuted }) => {
             const isControl = role === 'ADMIN' || role === 'TESTER';
-            
-            // STATE INITIALIZATION FROM LOCALSTORAGE
-            // Init with defaults, but effect will sync
             const [currentTierIdx, setCurrentTierIdx] = useState(() => Number(localStorage.getItem('guild_session_tier')) || 0);
             const [currentWinCount, setCurrentWinCount] = useState(() => Number(localStorage.getItem('guild_session_count')) || 0);
+            const gameStateRef = useRef({ tierIdx: Number(localStorage.getItem('guild_session_tier')) || 0, winCount: Number(localStorage.getItem('guild_session_count')) || 0 });
+            useEffect(() => { localStorage.setItem('guild_session_tier', currentTierIdx); gameStateRef.current.tierIdx = currentTierIdx; }, [currentTierIdx]);
+            useEffect(() => { localStorage.setItem('guild_session_count', currentWinCount); gameStateRef.current.winCount = currentWinCount; }, [currentWinCount]);
             
-            // Logic Ref
-            const gameStateRef = useRef({ 
-                tierIdx: Number(localStorage.getItem('guild_session_tier')) || 0, 
-                winCount: Number(localStorage.getItem('guild_session_count')) || 0 
-            });
-            
-            // Persistence for Game Flow
-            useEffect(() => {
-                localStorage.setItem('guild_session_tier', currentTierIdx);
-                gameStateRef.current.tierIdx = currentTierIdx;
-            }, [currentTierIdx]);
-
-            useEffect(() => {
-                localStorage.setItem('guild_session_count', currentWinCount);
-                gameStateRef.current.winCount = currentWinCount;
-            }, [currentWinCount]);
-            
-            // Current Session Results derived from Archives
+            // For UI display, we look at the active session passed from props
             const activeSession = archives.find(s => s.status === 'active');
             const sessionResults = activeSession ? activeSession.results : [];
-
-            // Sync States
+            // sessionWinners is just an array of results to check specific tier wins
+            
             const [isSpinning, setIsSpinning] = useState(false);
             const [tape, setTape] = useState([]);
             const [winner, setWinner] = useState(null);
-            
             const [showModal, setShowModal] = useState(false);
             const [winnerOverlayData, setWinnerOverlayData] = useState(null);
+            const [isDebugOpen, setIsDebugOpen] = useState(false);
             
+            // Expanded History Toggle for Bottom List
+            const [expandedHistId, setExpandedHistId] = useState(null);
+
             const listRef = useRef(null);
-            const lastSpinTimestamp = useRef(Date.now()); // Fix: Ignore old snapshots on reload
+            const lastSpinTimestamp = useRef(Date.now());
             const spinAudioRef = useRef(null);
-            
             const currentTier = TIERS[currentTierIdx];
             const maxWins = TIER_COUNTS[currentTier];
             const isFinished = currentTierIdx >= TIERS.length;
-            const eligible = members.filter(m => getTierG(getDiff(m)) >= currentTier);
 
-            // Constants
+            // STRICT FILTERING: Qualifies for Tier AND hasn't won THIS TIER yet in this session
+            const eligible = members.filter(m => {
+                const diff = getDiff(m);
+                const tierG = getTierG(diff);
+                const qualifies = tierG >= currentTier; // 1. Investment Check
+                
+                // 2. Previous Win Check (Specific to THIS tier)
+                const alreadyWonThisTier = sessionResults.some(r => r.name === m.name && r.tier === currentTier);
+                
+                return qualifies && !alreadyWonThisTier;
+            });
+            
+            // For Display List: All who qualify for this Tier
+            const allQualifiers = members.filter(m => getTierG(getDiff(m)) >= currentTier);
+            
             const CONTAINER_HEIGHT = 320; 
             const CARD_HEIGHT = 100;
             const WIN_INDEX = 40; 
-            
+
             // RESTORE STATE ON MOUNT
             useEffect(() => {
                  const lastWinnerJson = localStorage.getItem('guild_last_winner');
                  if (lastWinnerJson && !isSpinning) {
                      try {
                          const lastWinData = JSON.parse(lastWinnerJson);
-                         // Reconstruct static tape to show last winner
-                         // If winner is found in members
                          const m = members.find(u => u.name === lastWinData.name) || {name: lastWinData.name, base:0, final:0, intermediate:0};
-                         
                          const staticTape = [];
-                         for(let i=0; i<60; i++) {
-                             if(i === WIN_INDEX) staticTape.push(m);
-                             else staticTape.push(m); // Just filler, doesn't matter visually much if blurred/static
-                         }
-                         setTape(staticTape);
-                         setWinner(m);
-                         
-                         // Calculate static offset
-                         const centerContainer = CONTAINER_HEIGHT / 2;
-                         const centerWinner = (WIN_INDEX * CARD_HEIGHT) + (CARD_HEIGHT / 2);
-                         const targetY = centerContainer - centerWinner;
-                         
-                         if (listRef.current) {
-                             listRef.current.style.transition = 'none';
-                             listRef.current.style.transform = `translateY(${targetY}px)`;
-                         }
+                         for(let i=0; i<60; i++) { if(i === WIN_INDEX) staticTape.push(m); else staticTape.push(m); }
+                         setTape(staticTape); setWinner(m);
+                         // STATIC POSITIONING
+                         const targetY = (CONTAINER_HEIGHT / 2) - ((WIN_INDEX * CARD_HEIGHT) + (CARD_HEIGHT / 2));
+                         if (listRef.current) { listRef.current.style.transition = 'none'; listRef.current.style.transform = `translateY(${targetY}px)`; }
                      } catch(e) {}
                  } else if (!isSpinning && eligible.length > 0) {
-                     // Default static view
-                     const staticTape = Array.from({length: 10}, (_, i) => eligible[i % eligible.length]);
+                     // Ensure no duplicates in static tape for better visual
+                     const shuffled = [...eligible].sort(() => 0.5 - Math.random());
+                     const staticTape = Array.from({length: 10}, (_, i) => shuffled[i % shuffled.length]); 
                      setTape(staticTape);
                  }
-            }, [eligible.length]); // Run when members/eligible loads
+            }, [eligible.length]);
 
-            const resetSession = async () => {
-                if(!confirm("Сбросить текущий прогресс (тиры)? Это не удалит историю.")) return;
+            const handleReset = async () => {
+                if(!confirm("Начать новую сессию? Текущая история сохранится в Архив.")) return;
                 
+                // Update Parent State via Prop
+                await onSessionReset();
+                
+                // Reset Local State
                 localStorage.removeItem('guild_session_tier');
                 localStorage.removeItem('guild_session_count');
                 localStorage.removeItem('guild_last_winner');
-                
                 setCurrentTierIdx(0);
                 setCurrentWinCount(0);
                 gameStateRef.current = { tierIdx: 0, winCount: 0 };
-                setTape([]);
                 setWinner(null);
-                
-                if(listRef.current) {
-                     listRef.current.style.transition = 'none';
-                     listRef.current.style.transform = 'translateY(0px)';
-                }
-                
-                await logAction("Сбросил прогресс сессии");
-                addToast({ title: "Сброс", message: "Этапы начаты заново", type: "info" });
+                setTape([]);
             };
             
-            const exportData = () => {
-                const data = {
-                    localStorage: { ...localStorage },
-                    timestamp: Date.now()
-                };
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `guild-backup-${new Date().toISOString().slice(0,10)}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            };
+            const exportData = () => { const data = { localStorage: { ...localStorage }, timestamp: Date.now() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `guild-backup-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
+            const importData = (event) => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const data = JSON.parse(e.target.result); if (data.localStorage) { if (!confirm("Это перезапишет все локальные данные и перезагрузит страницу. Продолжить?")) return; Object.keys(data.localStorage).forEach(key => { localStorage.setItem(key, data.localStorage[key]); }); window.location.reload(); } } catch (err) { alert("Ошибка чтения файла"); } }; reader.readAsText(file); };
 
-            const importData = (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const data = JSON.parse(e.target.result);
-                        if (data.localStorage) {
-                            if (!confirm("Это перезапишет все локальные данные и перезагрузит страницу. Продолжить?")) return;
-                            Object.keys(data.localStorage).forEach(key => {
-                                localStorage.setItem(key, data.localStorage[key]);
-                            });
-                            window.location.reload();
-                        }
-                    } catch (err) {
-                        alert("Ошибка чтения файла");
-                    }
-                };
-                reader.readAsText(file);
-            };
-
-            // LISTENER: Sync
-            useEffect(() => {
-                const unsub = onSnapshot(doc(db, "gamestate", "roulette"), (docSnap) => {
-                    const data = docSnap.data();
-                    if (data) {
-                        // SYNC CLOSING
-                        if (data.showWinnerModal === false) {
-                            setWinnerOverlayData(null);
-                        }
-                        // SYNC SPINNING
-                        if (data.isSpinning) {
-                            if (data.timestamp > lastSpinTimestamp.current) {
-                                lastSpinTimestamp.current = data.timestamp;
-                                animateSpin(data.winner, data.tier);
-                            }
-                        }
-                    }
-                });
-                return () => unsub();
-            }, [members]);
+            useEffect(() => { const unsub = onSnapshot(doc(db, "gamestate", "roulette"), (docSnap) => { const data = docSnap.data(); if (data) { if (data.showWinnerModal === false) { setWinnerOverlayData(null); } if (data.isSpinning) { if (data.timestamp > lastSpinTimestamp.current) { lastSpinTimestamp.current = data.timestamp; animateSpin(data.winner, data.tier); } } } }); return () => unsub(); }, [members]);
 
             const triggerSpin = async () => {
                 const currentLogicTierIdx = gameStateRef.current.tierIdx;
                 const currentLogicTier = TIERS[currentLogicTierIdx];
-                const pool = members.filter(m => getTierG(getDiff(m)) >= currentLogicTier);
                 
-                if(isSpinning || pool.length === 0 || currentLogicTierIdx >= TIERS.length) return;
+                // RE-FETCH ACTIVE SESSION WINNERS FOR STRICT FILTERING
+                const sessionResultsRef = activeSession ? activeSession.results : [];
                 
-                playSound('click');
-                
-                const winnerIndex = Math.floor(Math.random() * pool.length);
-                const selected = pool[winnerIndex];
-
-                // Close any open modals first for cleanup
-                await updateDoc(doc(db, "gamestate", "roulette"), { showWinnerModal: false });
-
-                await setDoc(doc(db, "gamestate", "roulette"), {
-                    isSpinning: true,
-                    winner: selected,
-                    tier: currentLogicTier,
-                    timestamp: Date.now(),
-                    initiator: role,
-                    showWinnerModal: false // Close existing modals
+                const pool = members.filter(m => {
+                     const diff = getDiff(m);
+                     const tierG = getTierG(diff);
+                     const qualifies = tierG >= currentLogicTier;
+                     const alreadyWonThisTier = sessionResultsRef.some(r => r.name === m.name && r.tier === currentLogicTier);
+                     return qualifies && !alreadyWonThisTier;
                 });
 
-                await logAction(`Запустил синхронный раунд Тир ${currentLogicTier}G`);
+                console.log("Eligible Pool for Spin:", pool.map(p => p.name));
+
+                if(pool.length === 0) {
+                     addToast({ title: `ОШИБКА`, message: `Нет доступных участников! Все выиграли или никто не подходит.`, type: 'error' });
+                     return;
+                }
+                if(isSpinning || currentLogicTierIdx >= TIERS.length) return;
+                
+                playSound('click');
+                // PURE RANDOM LOGIC (EQUAL CHANCE)
+                const winnerIndex = Math.floor(Math.random() * pool.length);
+                const selected = pool[winnerIndex];
+                await updateDoc(doc(db, "gamestate", "roulette"), { showWinnerModal: false });
+                await setDoc(doc(db, "gamestate", "roulette"), { isSpinning: true, winner: selected, tier: currentLogicTier, timestamp: Date.now(), initiator: role, showWinnerModal: false });
+                
+                // Note: Actual log write happens in animateSpin
             };
             
-            const handleOverlayClose = async () => {
-                if (isControl) {
-                    await updateDoc(doc(db, "gamestate", "roulette"), { showWinnerModal: false });
-                }
-                setWinnerOverlayData(null);
-            };
+            const handleOverlayClose = async () => { if (isControl) { await updateDoc(doc(db, "gamestate", "roulette"), { showWinnerModal: false }); } setWinnerOverlayData(null); };
 
             const animateSpin = (selectedWinner, tierForSpin) => {
-                setIsSpinning(true);
-                setWinner(selectedWinner);
-                setWinnerOverlayData(null); 
-                
-                // Audio
-                const spinAudio = playSound('spin');
-                if (spinAudio) {
-                    spinAudioRef.current = spinAudio;
-                    spinAudio.loop = true;
-                }
-                
-                // SAVE LAST WINNER LOCAL
+                setIsSpinning(true); setWinner(selectedWinner); setWinnerOverlayData(null); 
+                const spinAudio = playSound('spin'); if (spinAudio) { spinAudioRef.current = spinAudio; spinAudio.loop = true; }
                 localStorage.setItem('guild_last_winner', JSON.stringify({name: selectedWinner.name, tier: tierForSpin}));
 
-                const tapeLength = 60;
-                const newTape = [];
-                const pool = members.filter(m => getTierG(getDiff(m)) >= tierForSpin);
+                const tapeLength = 60; 
                 
-                for(let i=0; i < tapeLength; i++) {
-                    if (i === WIN_INDEX) {
-                        newTape.push(selectedWinner);
-                    } else {
-                        if (pool.length > 0) {
-                            newTape.push(pool[Math.floor(Math.random() * pool.length)]);
-                        } else {
-                            newTape.push(selectedWinner);
-                        }
-                    }
+                // Regenerate pool strictly for visual tape (logic winner already passed)
+                const sessionResultsRef = activeSession ? activeSession.results : [];
+                const pool = members.filter(m => {
+                     if (m.name === selectedWinner.name) return true; // Always include the current winner
+                     const diff = getDiff(m);
+                     const tierG = getTierG(diff);
+                     const qualifies = tierG >= tierForSpin;
+                     const alreadyWonThisTier = sessionResultsRef.some(r => r.name === m.name && r.tier === tierForSpin);
+                     return qualifies && !alreadyWonThisTier;
+                });
+                
+                // Capture Math Context for Logging
+                const poolSize = pool.length;
+                const probability = poolSize > 0 ? (100 / poolSize).toFixed(2) + '%' : '100%';
+                const winnerDiff = getDiff(selectedWinner);
+                const winnerScore = getTierG(winnerDiff) + 'G';
+
+                const safePool = pool.length > 0 ? pool : [selectedWinner];
+                const shuffledPool = [...safePool].sort(() => 0.5 - Math.random());
+                const newTape = [];
+                while(newTape.length < tapeLength) {
+                    newTape.push(...shuffledPool);
                 }
+                newTape.length = tapeLength; // Trim excess
+                newTape[WIN_INDEX] = selectedWinner; // Force winner
                 setTape(newTape);
 
                 if(listRef.current) {
-                    listRef.current.style.transition = 'none';
-                    listRef.current.style.transform = 'translateY(0px)';
-                    listRef.current.offsetHeight; 
+                    listRef.current.style.transition = 'none'; listRef.current.style.transform = 'translateY(0px)'; listRef.current.offsetHeight; 
+                    const jitter = Math.floor(Math.random() * 60) - 30; 
+                    const targetY = (CONTAINER_HEIGHT / 2) - ((WIN_INDEX * CARD_HEIGHT) + (CARD_HEIGHT / 2)) + jitter;
 
-                    const centerContainer = CONTAINER_HEIGHT / 2;
-                    const centerWinner = (WIN_INDEX * CARD_HEIGHT) + (CARD_HEIGHT / 2);
-                    const targetY = centerContainer - centerWinner;
-
-                    setTimeout(() => {
-                        if(listRef.current) {
-                            listRef.current.style.transition = 'transform 8s cubic-bezier(0.1, 0, 0.1, 1)';
-                            listRef.current.style.transform = `translateY(${targetY}px)`;
-                        }
-                    }, 50);
+                    setTimeout(() => { if(listRef.current) { listRef.current.style.transition = 'transform 8s cubic-bezier(0.1, 0, 0.1, 1)'; listRef.current.style.transform = `translateY(${targetY}px)`; } }, 50);
                 }
 
                 setTimeout(async () => {
-                    setIsSpinning(false);
-                    if (spinAudioRef.current) {
-                        spinAudioRef.current.pause();
-                        spinAudioRef.current = null;
-                    }
-                    playSound('win');
-                    speak(`Победитель — ${selectedWinner.name.split('#')[0]}!`);
+                    setIsSpinning(false); if (spinAudioRef.current) { spinAudioRef.current.pause(); spinAudioRef.current = null; }
+                    playSound('win'); speak(`Победитель — ${selectedWinner.name.split('#')[0]}!`);
                     
-                    const result = {
-                        tier: tierForSpin,
-                        name: selectedWinner.name,
-                        prize: TIER_PRIZES[tierForSpin],
-                        time: new Date().toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" })
+                    // Construct Meta Data for logs
+                    const metaData = {
+                        investment: fmt(getDiff(selectedWinner)),
+                        poolSize: poolSize,
+                        probability: probability,
+                        stageTarget: tierForSpin + 'G',
+                        winnerScore: winnerScore,
+                        winnerId: selectedWinner.id || 'N/A'
                     };
 
-                    // IMMEDIATE ARCHIVE UPDATE
-                    updateArchive(result);
+                    const result = { 
+                        tier: tierForSpin, 
+                        name: selectedWinner.name, 
+                        prize: TIER_PRIZES[tierForSpin], 
+                        time: new Date().toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" }),
+                        meta: metaData // Save meta to session result too
+                    };
                     
-                    setWinnerOverlayData({
-                        name: selectedWinner.name,
-                        prize: TIER_PRIZES[tierForSpin],
-                        tier: tierForSpin
-                    });
+                    if (updateArchive) {
+                         updateArchive(result);
+                    }
+                    if (logAction) {
+                         await logAction(`Победитель ${selectedWinner.name} (Тир ${tierForSpin}G)`, 'WIN', metaData);
+                    }
 
-                    addToast({
-                        title: `🏆 ПОБЕДА!`,
-                        message: `${selectedWinner.name} выиграл ${TIER_PRIZES[tierForSpin]} 💎`,
-                        type: 'win'
-                    });
+                    setWinnerOverlayData({ name: selectedWinner.name, prize: TIER_PRIZES[tierForSpin], tier: tierForSpin });
+                    addToast({ title: `🏆 ПОБЕДА!`, message: `${selectedWinner.name} выиграл ${TIER_PRIZES[tierForSpin]} 💎`, type: 'win' });
 
-                    const currentIdx = gameStateRef.current.tierIdx;
-                    const currentCount = gameStateRef.current.winCount;
-                    const logicTier = TIERS[currentIdx];
-                    const logicLimit = TIER_COUNTS[logicTier];
-
+                    const currentIdx = gameStateRef.current.tierIdx; const currentCount = gameStateRef.current.winCount; const logicTier = TIERS[currentIdx]; const logicLimit = TIER_COUNTS[logicTier];
                     if (tierForSpin === logicTier) {
                          if (currentCount + 1 >= logicLimit) {
-                             if (currentIdx + 1 < TIERS.length) {
-                                 const nextIdx = currentIdx + 1;
-                                 gameStateRef.current = { tierIdx: nextIdx, winCount: 0 };
-                                 setCurrentWinCount(0);
-                                 setCurrentTierIdx(nextIdx);
-                                 const nextTierVal = TIERS[nextIdx];
-                                 setTimeout(() => {
-                                     addToast({
-                                         title: `🔔 СЛЕДУЮЩИЙ ЭТАП`,
-                                         message: `Начинаем розыгрыш ${nextTierVal}G!`,
-                                         type: 'info'
-                                     });
-                                 }, 2000);
-                             } else {
-                                 gameStateRef.current.winCount = currentCount + 1;
-                                 setCurrentWinCount(prev => prev + 1);
-                                 setCurrentTierIdx(prev => prev + 1);
-                                 setTimeout(() => setShowModal(true), 3000);
+                             if (currentIdx + 1 < TIERS.length) { 
+                                const nextIdx = currentIdx + 1; 
+                                gameStateRef.current = { tierIdx: nextIdx, winCount: 0 }; 
+                                setCurrentWinCount(0); 
+                                setCurrentTierIdx(nextIdx); 
+                                const nextTierVal = TIERS[nextIdx]; 
+                                setTimeout(() => { addToast({ title: `🔔 СЛЕДУЮЩИЙ ЭТАП`, message: `Начинаем розыгрыш ${nextTierVal}G!`, type: 'info' }); logAction(`Переход к этапу ${nextTierVal}G`, 'SYSTEM'); }, 2000); 
+                             } else { 
+                                gameStateRef.current.winCount = currentCount + 1; setCurrentWinCount(prev => prev + 1); setCurrentTierIdx(prev => prev + 1); setTimeout(() => setShowModal(true), 3000); logAction("Сессия завершена", 'SYSTEM');
                              }
-                         } else {
-                             gameStateRef.current.winCount = currentCount + 1;
-                             setCurrentWinCount(prev => prev + 1);
-                         }
+                         } else { gameStateRef.current.winCount = currentCount + 1; setCurrentWinCount(prev => prev + 1); }
                     }
-
-                    if (role === 'ADMIN' || role === 'TESTER') {
-                         await updateDoc(doc(db, "gamestate", "roulette"), { isSpinning: false, showWinnerModal: true });
-                    }
-
+                    if (role === 'ADMIN' || role === 'TESTER') { await updateDoc(doc(db, "gamestate", "roulette"), { isSpinning: false, showWinnerModal: true }); }
                 }, 8500);
             };
 
-            const finishSession = async () => {
-                 // Close the current session in archives
-                 // Logic handled in App mainly, but here we can reset UI
-                await logAction(`Завершил сессию`);
-                setShowModal(false);
-            };
-
-            const sortedEligible = [...eligible].sort((a,b) => a.name.localeCompare(b.name));
+            const sortedEligible = [...allQualifiers].sort((a,b) => a.name.localeCompare(b.name));
             const winChance = eligible.length > 0 ? (100 / eligible.length).toFixed(2) : "0.00";
-
+            
             return (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
                     <WinnerOverlay winner={winnerOverlayData} onClose={handleOverlayClose} role={role} />
-                
+                    {isDebugOpen && (
+                        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setIsDebugOpen(false)}>
+                            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><Wrench className="text-amber-500" size={20}/> Debug: Pool Verification</h3>
+                                    <button onClick={() => setIsDebugOpen(false)}><X className="text-slate-500 hover:text-white" size={20}/></button>
+                                </div>
+                                <div className="text-xs text-slate-400 mb-2">Total Candidates: <span className="text-white font-bold">{eligible.length}</span></div>
+                                <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-950 p-2 rounded border border-slate-800 font-mono text-xs text-green-400">
+                                    {eligible.length === 0 ? "No candidates" : eligible.map((m, i) => (
+                                        <div key={i} className="border-b border-slate-800/50 py-1">{i+1}. {m.name} ({getTierG(getDiff(m))}G)</div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <div className="lg:col-span-2 flex flex-col gap-6">
                         <div className="flex justify-between items-end bg-slate-800 p-4 rounded-xl border border-slate-700">
-                            <div>
-                                <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Текущий Этап</div>
-                                <div className="text-4xl font-black text-amber-500 drop-shadow-md leading-none">
-                                    {currentTier}G 
-                                    <span className="text-lg text-slate-500 ml-2 font-medium">
-                                        (Место {Math.min(currentWinCount + 1, maxWins)}/{maxWins})
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2">
-                                <div className="text-right">
-                                     <div className="text-xs text-slate-400 uppercase mb-1">Приз Этапа</div>
-                                     <div className="text-2xl font-bold text-white">{TIER_PRIZES[currentTier]} 💎</div>
-                                </div>
-                                {isControl && (
-                                    <div className="flex gap-2">
-                                        <button onClick={resetSession} className="text-[10px] flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded transition">
-                                            <RefreshCw size={10} /> Сброс
-                                        </button>
-                                        <button onClick={exportData} className="text-[10px] flex items-center gap-1 bg-blue-900/40 hover:bg-blue-800 text-blue-300 px-2 py-1 rounded transition border border-blue-800">
-                                            <Download size={10} /> Бэкап
-                                        </button>
-                                        <label className="text-[10px] flex items-center gap-1 bg-green-900/40 hover:bg-green-800 text-green-300 px-2 py-1 rounded transition border border-green-800 cursor-pointer">
-                                            <Upload size={10} /> Load
-                                            <input type="file" onChange={importData} className="hidden" accept=".json" />
-                                        </label>
-                                    </div>
-                                )}
-                            </div>
+                            <div><div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Текущий Этап</div><div className="text-4xl font-black text-amber-500 drop-shadow-md leading-none">{currentTier}G <span className="text-lg text-slate-500 ml-2 font-medium">(Место {Math.min(currentWinCount + 1, maxWins)}/{maxWins})</span></div></div>
+                            <div className="flex flex-col items-end gap-2"><div className="text-right"><div className="text-xs text-slate-400 uppercase mb-1">Приз Этапа</div><div className="text-2xl font-bold text-white">{TIER_PRIZES[currentTier]} 💎</div></div>{isControl && (<div className="flex gap-2"><button onClick={handleReset} className="text-[10px] flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded transition"><RefreshCw size={10} /> Сброс</button><button onClick={exportData} className="text-[10px] flex items-center gap-1 bg-blue-900/40 hover:bg-blue-800 text-blue-300 px-2 py-1 rounded transition border border-blue-800"><Download size={10} /> Бэкап</button><label className="text-[10px] flex items-center gap-1 bg-green-900/40 hover:bg-green-800 text-green-300 px-2 py-1 rounded transition border border-green-800 cursor-pointer"><Upload size={10} /> Load<input type="file" onChange={importData} className="hidden" accept=".json" /></label></div>)}</div>
                         </div>
 
                         <div className="relative bg-slate-900 rounded-xl border-4 border-slate-800 shadow-2xl overflow-hidden" style={{ height: `${CONTAINER_HEIGHT}px` }}>
-                            <div className="absolute top-1/2 left-4 right-4 transform -translate-y-1/2 h-[100px] border-y-4 border-amber-500 z-20 shadow-[0_0_20px_rgba(245,158,11,0.2)] bg-amber-500/5 pointer-events-none flex justify-between items-center px-2">
+                            
+                            {/* CENTER FRAME */}
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] h-[110px] border-y-4 border-amber-500 z-20 shadow-[0_0_20px_rgba(245,158,11,0.2)] bg-amber-500/5 pointer-events-none flex justify-between items-center px-2">
                                 <div className="text-amber-500 animate-pulse">▶</div>
                                 <div className="text-amber-500 animate-pulse">◀</div>
                             </div>
-                            <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-slate-900 to-transparent z-10 pointer-events-none"></div>
-                            <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-slate-900 to-transparent z-10 pointer-events-none"></div>
-
-                            <div ref={listRef} className={`flex flex-col items-center ${isSpinning ? 'spin-blur' : ''}`} style={{ willChange: 'transform' }}>
+                            
+                            {/* ROULETTE MASK / FOG EFFECT */}
+                            <div ref={listRef} className={`flex flex-col items-center roulette-mask ${isSpinning ? 'spin-blur' : ''}`} style={{ willChange: 'transform' }}>
                                 {tape.length === 0 && <div className="h-full flex items-center justify-center text-slate-600 mt-20">Нет участников</div>}
-                                {tape.map((m, i) => (
-                                    <div key={i} className="w-full flex items-center justify-between px-10 border-b border-slate-800/50 bg-slate-900" style={{ height: `${CARD_HEIGHT}px` }}>
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-lg font-bold text-slate-500">{m.name[0]}</div>
-                                            <div className="text-left">
-                                                <div className={`text-xl font-bold ${i === WIN_INDEX && !isSpinning ? 'winner-name' : 'text-slate-300'}`}>{m.name.split('#')[0]}</div>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-amber-600 font-mono font-bold text-lg">{getTierG(getDiff(m))}G</div>
-                                        </div>
-                                    </div>
-                                ))}
+                                {tape.map((m, i) => (<div key={i} className="w-full flex items-center justify-between px-10 border-b border-slate-800/50 bg-slate-900" style={{ height: `${CARD_HEIGHT}px` }}><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-lg font-bold text-slate-500">{m.name[0]}</div><div className="text-left"><div className={`text-xl font-bold ${i === WIN_INDEX && !isSpinning ? 'winner-name' : 'text-slate-300'}`}>{m.name.split('#')[0]}</div></div></div><div className="text-right"><div className="text-amber-600 font-mono font-bold text-lg">{getTierG(getDiff(m))}G</div></div></div>))}
                             </div>
                         </div>
 
                         <div className="flex flex-col items-center justify-center gap-4">
-                            {winner && !isSpinning && (
-                                <div className="text-center animate-bounce">
-                                    <div className="text-amber-500 uppercase text-xs font-bold tracking-widest">Победитель</div>
-                                    <div className="text-4xl font-black text-white">{winner.name}</div>
-                                </div>
-                            )}
-                            
-                            {isControl ? (
-                                <button onClick={triggerSpin} disabled={isSpinning || isFinished || eligible.length === 0}
-                                    className="w-full py-5 cta-button rounded-xl text-slate-900 shadow-[0_0_30px_rgba(245,158,11,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition transform active:scale-95">
-                                    {isSpinning ? 'ВРАЩЕНИЕ...' : isFinished ? 'СЕССИЯ ЗАВЕРШЕНА' : eligible.length === 0 ? 'НЕТ УЧАСТНИКОВ' : 'ЗАПУСТИТЬ РАУНД'}
-                                </button>
-                            ) : (
-                                <div className="text-slate-500 italic p-4 border border-slate-700 rounded-lg">
-                                    {isSpinning ? "Идет розыгрыш..." : "Ожидайте запуска администратором..."}
-                                </div>
-                            )}
+                            {winner && !isSpinning && (<div className="text-center animate-bounce"><div className="text-amber-500 uppercase text-xs font-bold tracking-widest">Победитель</div><div className="text-4xl font-black text-white">{winner.name}</div></div>)}
+                            <div className="flex gap-2 w-full">
+                                {isControl && (
+                                    <button onClick={() => setIsDebugOpen(true)} className="w-16 py-5 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition relative" title="Debug: Check Tape">
+                                        <Wrench size={20} />
+                                        <span className="ml-2 text-xs font-bold bg-slate-950 px-2 py-1 rounded text-amber-500 border border-slate-700">{eligible.length}</span>
+                                    </button>
+                                )}
+                                {isControl ? (
+                                    <button onClick={triggerSpin} disabled={isSpinning || isFinished || eligible.length === 0} className="flex-1 py-5 cta-button rounded-xl text-slate-900 shadow-[0_0_30px_rgba(245,158,11,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition transform active:scale-95">
+                                        {isSpinning ? 'ВРАЩЕНИЕ...' : isFinished ? 'СЕССИЯ ЗАВЕРШЕНА' : eligible.length === 0 ? 'НЕТ УЧАСТНИКОВ' : 'ЗАПУСТИТЬ РАУНД'}
+                                    </button>
+                                ) : (
+                                    <div className="flex-1 text-slate-500 italic p-4 border border-slate-700 rounded-lg text-center">
+                                        {isSpinning ? "Идет розыгрыш..." : "Ожидайте запуска администратором..."}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
                             <h3 className="text-slate-400 text-xs font-bold uppercase mb-3">История текущей сессии</h3>
                             <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
                                 {sessionResults.slice().reverse().map((r, i) => (
-                                    <div key={i} className="history-item p-2 rounded flex justify-between items-center">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-slate-500 font-mono text-xs">{r.time}</span>
-                                            <span className="bg-amber-500/20 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-bold">{r.tier}G</span>
-                                            <span className="text-white font-bold text-sm">{r.name}</span>
+                                    <React.Fragment key={i}>
+                                        <div onClick={() => setExpandedHistId(expandedHistId === i ? null : i)} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-slate-700/50 cursor-pointer hover:bg-slate-900 transition">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-1">
+                                                    {r.meta && (expandedHistId === i ? <ChevronUp size={12} className="text-slate-500"/> : <ChevronDown size={12} className="text-slate-500"/>)}
+                                                    <span className="text-slate-500 font-mono text-xs">{r.time}</span>
+                                                </div>
+                                                <span className="bg-amber-500/20 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-bold">{r.tier}G</span>
+                                                <span className="text-white font-bold text-sm">{r.name}</span>
+                                            </div>
+                                            <div className="text-amber-400 font-mono text-xs">{r.prize} 💎</div>
                                         </div>
-                                        <div className="text-amber-400 font-mono text-xs">{r.prize} 💎</div>
-                                    </div>
+                                        {expandedHistId === i && r.meta && (
+                                            <div className="bg-slate-950/50 p-2 text-[10px] font-mono text-slate-400 border-l-2 border-slate-700 ml-4 mb-2">
+                                                <div>Pool Size: {r.meta.poolSize}</div>
+                                                <div>Probability: {r.meta.probability}</div>
+                                                <div>Winner Score: {r.meta.winnerScore}</div>
+                                            </div>
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </div>
                         </div>
                     </div>
 
                     <div className="lg:col-span-1 bg-slate-800 rounded-xl border border-slate-700 flex flex-col overflow-hidden h-[700px]">
-                        <div className="p-4 bg-slate-900 border-b border-slate-700 flex justify-between items-center">
-                            <h3 className="text-slate-300 font-bold text-sm uppercase">Участники</h3>
-                            <span className="text-amber-500 text-xs font-bold">{sortedEligible.length} чел.</span>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-                            {sortedEligible.map((m, i) => (
-                                <div key={m.id} className="participant-card p-2 flex justify-between items-center">
-                                    <div className="flex justify-between items-center mb-1 w-full">
-                                        <div className="font-bold text-xs text-slate-300 truncate w-32">{m.name.split('#')[0]}</div>
-                                        <div className="text-right">
-                                            <div className="text-slate-500 font-mono text-[10px] uppercase">ШАНС</div>
-                                            <div className="chance-badge">{winChance}%</div>
+                        <div className="p-4 bg-slate-900 border-b border-slate-700 flex justify-between items-center"><h3 className="text-slate-300 font-bold text-sm uppercase">Участники</h3><span className="text-amber-500 text-xs font-bold">{allQualifiers.length} чел.</span></div>
+                        
+                        {/* COMPACT 2-COLUMN GRID LAYOUT */}
+                        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                            <div className="grid grid-cols-2 gap-2 content-start">
+                                {sortedEligible.map((m, i) => {
+                                    const isWinner = sessionResults.some(r => r.name === m.name && r.tier === currentTier);
+                                    return (
+                                    <div key={m.id} className={`bg-slate-900/40 p-1.5 rounded border border-slate-700/50 hover:border-amber-500/30 transition flex flex-col justify-between ${isWinner ? 'opacity-50 border-red-900/50' : ''}`}>
+                                        <div className={`font-bold text-[11px] text-slate-300 truncate ${isWinner ? 'line-through text-slate-500' : ''}`}>{m.name.split('#')[0]}</div>
+                                        <div className="flex justify-between items-end mt-1">
+                                            <div className="text-slate-600 text-[9px] uppercase">ШАНС</div>
+                                            <div className="text-amber-500 font-bold text-xs">{isWinner ? '-' : winChance + '%'}</div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                )})}
+                            </div>
                         </div>
                     </div>
                     
@@ -1301,8 +989,8 @@
                                     ))}
                                 </div>
                                 <div className="grid grid-cols-1">
-                                    <button onClick={finishSession} className="bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
-                                        <Save size={16} /> Закрыть окно
+                                    <button onClick={handleReset} className="bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
+                                        <Save size={16} /> Сохранить и Сбросить
                                     </button>
                                 </div>
                             </div>
@@ -1311,171 +999,68 @@
                 </div>
             );
         };
-
-        // --- MAIN APP ---
         const App = () => {
             const [role, setRole] = useState('GUEST'); 
             const [activeTab, setActiveTab] = useState('table');
             const [members, setMembers] = useState(DEMO_DATA); 
-            // ARCHIVES State now managed via LocalStorage logic for single session
             const [archives, setArchives] = useState([]); 
             const [logs, setLogs] = useState([]);
             const [isLoginOpen, setIsLoginOpen] = useState(false);
             const [toasts, setToasts] = useState([]);
             const [isMuted, setIsMuted] = useState(false);
-
-            // AUDIO MANAGER
-            const playSound = (type) => {
-                if (isMuted) return null;
-                const audio = new Audio(AUDIO_URLS[type]);
-                audio.volume = 0.5;
-                audio.play().catch(e => console.log("Audio play failed", e));
-                return audio;
-            };
-
-            const speak = (text) => {
-                if (isMuted) return;
-                if ('speechSynthesis' in window) {
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.lang = 'ru-RU';
-                    utterance.rate = 1.0;
-                    window.speechSynthesis.speak(utterance);
-                }
-            };
-
-            // ARCHIVE INIT LOGIC
-            useEffect(() => {
-                const loadArchives = () => {
-                    let data = JSON.parse(localStorage.getItem('guild_archives') || '[]');
-                    
-                    // Cleanup empty sessions
-                    data = data.filter(s => s.results && s.results.length > 0 || s.date === new Date().toLocaleDateString("ru-RU"));
-                    
-                    const today = new Date().toLocaleDateString("ru-RU");
-                    let active = data.find(s => s.date === today && s.status === 'active');
-                    
-                    if (!active) {
-                        active = { id: Date.now(), date: today, results: [], status: 'active' };
-                        data.push(active);
-                    }
-                    
-                    setArchives(data);
-                    localStorage.setItem('guild_archives', JSON.stringify(data));
-                };
-                loadArchives();
-            }, []);
-
-            const updateArchive = (result) => {
-                const newArchives = [...archives];
-                const activeIdx = newArchives.findIndex(s => s.status === 'active');
-                if (activeIdx > -1) {
-                    newArchives[activeIdx].results.push(result);
-                    setArchives(newArchives);
-                    localStorage.setItem('guild_archives', JSON.stringify(newArchives));
-                }
-            };
-
-            const addToast = (toast) => {
-                const id = Date.now();
-                setToasts(prev => [...prev, { ...toast, id }]);
-                setTimeout(() => {
-                    setToasts(prev => prev.filter(t => t.id !== id));
-                }, 5000);
-            };
-
-            const removeToast = (id) => {
-                setToasts(prev => prev.filter(t => t.id !== id));
-            };
-
-            useEffect(() => {
-                const q = query(collection(db, "users"));
-                const unsub = onSnapshot(q, (snapshot) => {
-                    if(!snapshot.empty) {
-                        const data = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                        data.sort((a,b) => Number(a.id) - Number(b.id));
-                        setMembers(data);
-                    }
-                });
-                return () => unsub();
-            }, []);
+            const playSound = (type) => { if (isMuted) return null; const audio = new Audio(AUDIO_URLS[type]); audio.volume = 0.5; audio.play().catch(e => console.log("Audio play failed", e)); return audio; };
+            const speak = (text) => { if (isMuted) return; if ('speechSynthesis' in window) { const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'ru-RU'; utterance.rate = 1.0; window.speechSynthesis.speak(utterance); } };
+            useEffect(() => { const loadArchives = () => { let data = JSON.parse(localStorage.getItem('guild_archives') || '[]'); data = data.filter(s => s.results && s.results.length > 0 || s.date === new Date().toLocaleDateString("ru-RU")); const today = new Date().toLocaleDateString("ru-RU"); let active = data.find(s => s.date === today && s.status === 'active'); if (!active) { active = { id: Date.now(), date: today, results: [], status: 'active' }; data.push(active); } setArchives(data); localStorage.setItem('guild_archives', JSON.stringify(data)); }; loadArchives(); }, []);
             
-            useEffect(() => {
-                if(role === 'ADMIN' || role === 'TESTER') {
-                    const q = query(collection(db, "logs"), orderBy("timestamp", "desc"), limit(50));
-                    const unsub = onSnapshot(q, (snapshot) => {
-                         const data = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                         setLogs(data);
-                    });
-                    return () => unsub();
-                }
-            }, [role]);
-
-            const toggleAuth = () => {
-                if(role !== 'GUEST') {
-                    setRole('GUEST');
-                    setActiveTab('table');
-                } else {
-                    setIsLoginOpen(true);
-                }
-            };
-            
-            const handleLogin = (newRole) => {
-                setRole(newRole);
-                setIsLoginOpen(false);
-            };
-            
-            const logAction = async (text) => {
-                 await addDoc(collection(db, "logs"), { text, role, timestamp: Date.now() });
+            // RESET SESSION LOGIC (Moved to App)
+            const handleSessionReset = async () => {
+                await logAction("Сбросил сессию (новая игра)", 'SYSTEM');
+                const now = new Date();
+                const timeLabel = `[${now.toLocaleTimeString("ru-RU", {hour:'2-digit', minute:'2-digit'})}]`;
+                
+                // Complete old session
+                const newArchives = archives.map(s => s.status === 'active' ? {...s, status: 'completed', date: s.date + ' ' + timeLabel} : s);
+                // Create new session
+                newArchives.push({ id: Date.now(), date: now.toLocaleDateString("ru-RU"), results: [], status: 'active' });
+                
+                setArchives(newArchives);
+                localStorage.setItem('guild_archives', JSON.stringify(newArchives));
             };
 
+            const updateArchive = (result) => { const newArchives = [...archives]; const activeIdx = newArchives.findIndex(s => s.status === 'active'); if (activeIdx > -1) { newArchives[activeIdx].results.push(result); setArchives(newArchives); localStorage.setItem('guild_archives', JSON.stringify(newArchives)); } };
+            const addToast = (toast) => { const id = Date.now(); setToasts(prev => [...prev, { ...toast, id }]); setTimeout(() => { setToasts(prev => prev.filter(t => t.id !== id)); }, 5000); };
+            const removeToast = (id) => { setToasts(prev => prev.filter(t => t.id !== id)); };
+            useEffect(() => { const q = query(collection(db, "users")); const unsub = onSnapshot(q, (snapshot) => { if(!snapshot.empty) { const data = snapshot.docs.map(d => ({id: d.id, ...d.data()})); data.sort((a,b) => Number(a.id) - Number(b.id)); setMembers(data); } }); return () => unsub(); }, []);
+            useEffect(() => { if(role === 'ADMIN' || role === 'TESTER') { const q = query(collection(db, "logs"), orderBy("timestamp", "desc"), limit(50)); const unsub = onSnapshot(q, (snapshot) => { const data = snapshot.docs.map(d => ({id: d.id, ...d.data()})); setLogs(data); }); return () => unsub(); } }, [role]);
+            const toggleAuth = () => { if(role !== 'GUEST') { setRole('GUEST'); setActiveTab('table'); } else { setIsLoginOpen(true); } };
+            const handleLogin = (newRole) => { setRole(newRole); setIsLoginOpen(false); };
+            const logAction = async (text, type = 'INFO', meta = null) => { await addDoc(collection(db, "logs"), { text, role, timestamp: Date.now(), type, meta }); };
             return (
                 <div className="min-h-screen pb-10 relative">
-                     <Snowfall
-                        style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh' }}
-                        snowflakeCount={100}
-                        color="rgba(255, 255, 255, 0.3)"
-                     />
+                     <Snowfall style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh' }} snowflakeCount={100} color="rgba(255, 255, 255, 0.3)" />
                     <div className="relative z-10">
                         <MoscowClock />
                         <ToastContainer toasts={toasts} removeToast={removeToast} />
-                        
-                        <div className="fixed top-4 right-4 z-50 flex gap-2">
-                             <button onClick={() => setIsMuted(!isMuted)} className="text-slate-500 hover:text-amber-500 transition bg-slate-900/50 p-2 rounded-full pointer-events-auto">
-                                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                            </button>
-                            <button onClick={toggleAuth} className="text-slate-500 hover:text-amber-500 transition bg-slate-900/50 p-2 rounded-full pointer-events-auto flex items-center gap-2">
-                                <span className="text-[10px] font-bold uppercase">{role}</span>
-                                {role !== 'GUEST' ? <Unlock size={20} /> : <Lock size={20} />}
-                            </button>
-                        </div>
-                        
+                        <div className="fixed top-4 right-4 z-50 flex gap-2"><button onClick={() => setIsMuted(!isMuted)} className="text-slate-500 hover:text-amber-500 transition bg-slate-900/50 p-2 rounded-full pointer-events-auto">{isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}</button><button onClick={toggleAuth} className="text-slate-500 hover:text-amber-500 transition bg-slate-900/50 p-2 rounded-full pointer-events-auto flex items-center gap-2"><span className="text-[10px] font-bold uppercase">{role}</span>{role !== 'GUEST' ? <Unlock size={20} /> : <Lock size={20} />}</button></div>
                         <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLogin={handleLogin} />
-
-                        <div className="max-w-[1400px] mx-auto pt-24 px-4">
-                            <CountdownTimer />
-                            <div className="flex justify-center mb-8">
-                                <div className="bg-slate-800 p-1 rounded-full border border-slate-700 flex">
-                                    <button onClick={() => setActiveTab('table')} className={`px-6 py-2 rounded-full text-sm font-bold transition ${activeTab === 'table' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Таблица</button>
-                                    <button onClick={() => setActiveTab('lottery')} className={`px-6 py-2 rounded-full text-sm font-bold transition ${activeTab === 'lottery' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Розыгрыш</button>
-                                    <button onClick={() => setActiveTab('archive')} className={`px-6 py-2 rounded-full text-sm font-bold transition ${activeTab === 'archive' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Архив</button>
-                                    {(role === 'ADMIN' || role === 'TESTER') && <button onClick={() => setActiveTab('logs')} className={`px-6 py-2 rounded-full text-sm font-bold transition flex items-center gap-1 ${activeTab === 'logs' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}><Eye size={14} /> Журнал</button>}
-                                    <button onClick={() => setActiveTab('updates')} className={`px-6 py-2 rounded-full text-sm font-bold transition flex items-center gap-1 ${activeTab === 'updates' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}><Megaphone size={14} /> Обновления</button>
-                                </div>
-                            </div>
-
-                            {activeTab === 'table' && <ExcelTable members={members} role={role} fullData={members} logAction={logAction} />}
-                            {activeTab === 'lottery' && <VerticalRoulette members={members} role={role} logAction={logAction} addToast={addToast} archives={archives} updateArchive={updateArchive} playSound={playSound} speak={speak} isMuted={isMuted} />}
-                            {activeTab === 'archive' && <ArchiveView archives={archives} />}
-                            {activeTab === 'logs' && (role === 'ADMIN' || role === 'TESTER') && <LogsView logs={logs} />}
-                            {activeTab === 'updates' && <ChangelogView />}
-                        </div>
+                        <div className="max-w-[1400px] mx-auto pt-24 px-4"><CountdownTimer /><div className="flex justify-center mb-8"><div className="bg-slate-800 p-1 rounded-full border border-slate-700 flex">
+                        
+                        <button onClick={() => setActiveTab('table')} className={`px-6 py-2 rounded-full text-sm font-bold transition ${activeTab === 'table' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Таблица</button>
+                        
+                        <button onClick={() => setActiveTab('lottery')} className={`px-6 py-2 rounded-full text-sm font-bold transition flex items-center gap-2 ${activeTab === 'lottery' ? 'bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-slate-800 text-amber-500 border border-amber-500/50 hover:bg-amber-500/10'}`}><PartyPopper size={16} /> РОЗЫГРЫШ</button>
+                        
+                        <button onClick={() => setActiveTab('archive')} className={`px-6 py-2 rounded-full text-sm font-bold transition ${activeTab === 'archive' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Архив</button>
+                        
+                        {(role === 'ADMIN' || role === 'TESTER') && <button onClick={() => setActiveTab('logs')} className={`px-6 py-2 rounded-full text-sm font-bold transition flex items-center gap-1 ${activeTab === 'logs' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}><Eye size={14} /> Журнал</button>}
+                        
+                        <button onClick={() => setActiveTab('updates')} className={`px-6 py-2 rounded-full text-sm font-bold transition flex items-center gap-1 ${activeTab === 'updates' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}><Megaphone size={14} /> Обновления</button>
+                        
+                        </div></div>{activeTab === 'table' && <ExcelTable members={members} role={role} fullData={members} logAction={logAction} />}{activeTab === 'lottery' && <VerticalRoulette members={members} role={role} logAction={logAction} addToast={addToast} archives={archives} updateArchive={updateArchive} onSessionReset={handleSessionReset} playSound={playSound} speak={speak} isMuted={isMuted} />}{activeTab === 'archive' && <ArchiveView archives={archives} />}{activeTab === 'logs' && (role === 'ADMIN' || role === 'TESTER') && <LogsView logs={logs} />}{activeTab === 'updates' && <ChangelogView />}</div>
                     </div>
                 </div>
             );
         };
-
-        const root = createRoot(document.getElementById('root'));
-        root.render(<App />);
+        const root = createRoot(document.getElementById('root')); root.render(<App />);
     </script>
 </body>
 </html>
