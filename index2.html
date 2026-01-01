@@ -1,9 +1,12 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnostic Mode</title>
+    <title>GuildMaster Randomizer (Standalone)</title>
+    
+    <!-- 1. Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -19,49 +22,513 @@
         }
       }
     </script>
+
+    <!-- 2. React 18 & ReactDOM (UMD) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 3. Babel Standalone (Compiles JSX in browser) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 4. Firebase Compat (v9/10) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <!-- 5. Libraries (Lucide, Recharts, Html-to-image) -->
+    <script src="https://unpkg.com/lucide-react@0.300.0/dist/umd/lucide-react.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.10.3/umd/Recharts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+
+    <style>
+        body { margin: 0; padding: 0; background-color: #020617; color: #e2e8f0; overflow: hidden; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+        @keyframes snow { 0% { transform: translateY(-10vh); } 100% { transform: translateY(100vh); } }
+        .snowflake { position: fixed; top: -10px; color: white; animation: snow 10s linear infinite; pointer-events: none; }
+    </style>
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "firebase/": "https://esm.sh/firebase@^12.7.0/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react": "https://esm.sh/react@^19.2.3",
     "html-to-image": "https://esm.sh/html-to-image@^1.11.13",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "recharts": "https://esm.sh/recharts@^3.6.0"
+    "firebase/": "https://esm.sh/firebase@^12.7.0/"
   }
 }
 </script>
-<style>
-    /* Custom Scrollbar used in GuildManager and LotterySystem */
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.1);
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.2);
-    }
-    
-    /* Animation classes that might not be in standard tailwind */
-    @keyframes snow {
-        0% { transform: translateY(-10vh); }
-        100% { transform: translateY(100vh); }
-    }
-</style>
 </head>
 <body>
     <div id="root"></div>
-    <script type="module" src="./index.tsx"></script>
+
+    <!-- MAIN APP SCRIPT -->
+    <script type="text/babel" data-presets="react,typescript">
+        /*******************************************************
+         * GLOBAL IMPORTS & CONFIG
+         *******************************************************/
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+        
+        // Destructure Icons
+        const { 
+            Users, Gift, ScanLine, Archive, Lock, Unlock, X, ChevronRight, AlertCircle, 
+            Volume2, VolumeX, Search, Plus, Save, Trash2, ArrowRight, Activity, Target, 
+            Camera, Image: ImageIcon, Settings, Clock, Check, Play, Trophy, RotateCcw, 
+            Copy, List, Loader2, Sparkles, User, CheckCircle2, ShieldAlert, Zap, 
+            Diamond, Coins, Package, Tag, Swords, Shield, Gem, TrendingUp, TrendingDown, 
+            Crosshair, Info, Scale, ArrowRightLeft, Calculator, ShieldCheck, Siren, 
+            History, Calendar, Hash
+        } = lucideReact;
+
+        // Destructure Recharts
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } = Recharts;
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCIFKGZioiflKAAA1tHkIZV0u1sMiPzUjo",
+            authDomain: "random-3fbaa.firebaseapp.com",
+            projectId: "random-3fbaa",
+            storageBucket: "random-3fbaa.firebasestorage.app",
+            messagingSenderId: "891768940412",
+            appId: "1:891768940412:web:312585e31aade1d7df66f9"
+        };
+
+        let db;
+        try {
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            console.log("Firebase initialized successfully");
+        } catch (e) {
+            document.body.insertAdjacentHTML('afterbegin', `<div style="background:#ef4444;color:white;padding:10px;text-align:center;z-index:9999;position:fixed;top:0;left:0;right:0">FIREBASE ERROR: ${e.message}</div>`);
+        }
+
+        // Constants
+        const ACCESS_CODE = "7777";
+        const BONUS_TIER_LEVEL = 999;
+        const OFFICIAL_START_DATE_ISO = "2026-01-01T21:00:00+03:00";
+        const OFFICIAL_START_TIMESTAMP = new Date(OFFICIAL_START_DATE_ISO).getTime();
+        const SESSION_DOC_ID = "ACTIVE";
+
+        const TIERS_CONFIG = [15, 25, 50, 75, 100, 125, BONUS_TIER_LEVEL];
+        const TIER_REWARDS = { 15: 120, 25: 180, 50: 400, 75: 600, 100: 900, 125: 2000, [BONUS_TIER_LEVEL]: 690 };
+        const TIER_WINNERS_COUNT = { 15: 3, 25: 2, 50: 1, 75: 1, 100: 1, 125: 1, [BONUS_TIER_LEVEL]: 2 };
+
+        const INITIAL_STAGES_CONFIG = {
+            "15": { tier: 15, winnersCount: 3, reward: 120, status: 'locked', winners: [] },
+            "25": { tier: 25, winnersCount: 2, reward: 180, status: 'locked', winners: [] },
+            "50": { tier: 50, winnersCount: 1, reward: 400, status: 'locked', winners: [] },
+            "75": { tier: 75, winnersCount: 1, reward: 600, status: 'locked', winners: [] },
+            "100": { tier: 100, winnersCount: 1, reward: 900, status: 'locked', winners: [] },
+            "125": { tier: 125, winnersCount: 1, reward: 2000, status: 'locked', winners: [] },
+            [BONUS_TIER_LEVEL.toString()]: { tier: BONUS_TIER_LEVEL, winnersCount: 2, reward: 690, status: 'locked', winners: [] },
+        };
+
+        const AudioController = {
+            playTick: () => {},
+            speak: (text) => { if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(text); u.lang = 'ru-RU'; window.speechSynthesis.speak(u); }},
+            playSuccess: () => {},
+            playMagic: () => {},
+        };
+
+        /*******************************************************
+         * SERVICES (Compat Shim)
+         *******************************************************/
+        
+        // --- LOTTERY LOGIC (Ported from modular to compat) ---
+        const subscribeToLottery = (cb) => db.collection("lotterySessions").doc(SESSION_DOC_ID).onSnapshot(s => cb(s.exists ? s.data() : null));
+
+        const adminResetSession = async (opName) => {
+            const now = Date.now();
+            const isOfficial = now >= OFFICIAL_START_TIMESTAMP;
+            await db.collection("lotterySessions").doc(SESSION_DOC_ID).set({
+                sessionId: Math.random().toString(36).substring(2, 10).toUpperCase(),
+                status: 'idle', currentTier: 15, allowed: [], rejected: [],
+                stages: JSON.parse(JSON.stringify(INITIAL_STAGES_CONFIG)),
+                lastWinner: null, updatedAt: now, operatorName: opName,
+                officialStartTimestamp: now, isOfficial, validity: isOfficial ? 'OFFICIAL' : 'TEST'
+            });
+        };
+
+        const adminStartCheck = async (members) => {
+            const ref = db.collection("lotterySessions").doc(SESSION_DOC_ID);
+            await db.runTransaction(async (t) => {
+                const doc = await t.get(ref);
+                if (!doc.exists) throw "No session";
+                const s = doc.data();
+                const ct = s.currentTier;
+                const allowed = [], rejected = [];
+                
+                const getDiff = m => {
+                    const cur = m.final>0 ? m.final : (m.intermediate>0 ? m.intermediate : m.base);
+                    return Math.max(0, cur - m.base);
+                };
+                
+                const prevWinners = new Set();
+                if(ct === BONUS_TIER_LEVEL) {
+                    Object.values(s.stages).forEach(st => {
+                        if(st.tier !== BONUS_TIER_LEVEL) st.winners.forEach(w => prevWinners.add(w));
+                    });
+                }
+                const target = (ct === BONUS_TIER_LEVEL ? 15 : ct) * 1000000000;
+
+                members.forEach(m => {
+                    const diff = getDiff(m);
+                    const p = { id: m.id, name: m.name, diff };
+                    if(!m.name.includes("#")) rejected.push({...p, reason: "Нет ID"});
+                    else if(diff < target) rejected.push({...p, reason: `< ${ct===BONUS_TIER_LEVEL?'15':ct}G`});
+                    else if(ct === BONUS_TIER_LEVEL && prevWinners.has(m.name)) rejected.push({...p, reason: "Уже выиграл"});
+                    else allowed.push(p);
+                });
+                allowed.sort((a,b) => b.diff - a.diff);
+                t.update(ref, { status: 'checking', allowed, rejected });
+            });
+        };
+
+        const adminSetReady = async () => db.collection("lotterySessions").doc(SESSION_DOC_ID).update({status: 'ready'});
+        
+        const adminStartRoll = async () => {
+            const ref = db.collection("lotterySessions").doc(SESSION_DOC_ID);
+            await ref.update({status: 'rolling', lastWinner: null});
+            await db.runTransaction(async t => {
+                const snap = await t.get(ref);
+                const s = snap.data();
+                const key = s.currentTier.toString();
+                const st = s.stages[key];
+                st.status = 'rolling';
+                t.update(ref, { [`stages.${key}`]: st });
+            });
+        };
+
+        const adminPickWinner = async () => {
+            const ref = db.collection("lotterySessions").doc(SESSION_DOC_ID);
+            await db.runTransaction(async t => {
+                const snap = await t.get(ref);
+                const s = snap.data();
+                if(s.allowed.length === 0) throw "Empty";
+                const idx = Math.floor(Math.random() * s.allowed.length);
+                const winner = s.allowed[idx];
+                const newAllowed = [...s.allowed]; newAllowed.splice(idx, 1);
+                const newRejected = [...s.rejected, {...winner, reason: "WINNER"}];
+                const key = s.currentTier.toString();
+                const st = s.stages[key];
+                const newWinners = [...st.winners, winner.name];
+                t.update(ref, {
+                    status: 'revealed', lastWinner: winner, allowed: newAllowed, rejected: newRejected,
+                    [`stages.${key}.winners`]: newWinners
+                });
+            });
+        };
+
+        const adminNextStage = async () => {
+            const ref = db.collection("lotterySessions").doc(SESSION_DOC_ID);
+            await db.runTransaction(async t => {
+                const snap = await t.get(ref);
+                const s = snap.data();
+                const idx = TIERS_CONFIG.indexOf(s.currentTier);
+                const key = s.currentTier.toString();
+                const st = s.stages[key];
+                st.status = 'done';
+                
+                if(idx < TIERS_CONFIG.length - 1) {
+                    const next = TIERS_CONFIG[idx+1];
+                    t.update(ref, { status: 'idle', currentTier: next, [`stages.${key}`]: st, lastWinner: null });
+                } else {
+                    t.update(ref, { status: 'finished', [`stages.${key}`]: st, lastWinner: null });
+                    // Archive
+                    const allW = Object.values(s.stages).flatMap(st => st.winners.map(n => ({ name: n, tier: st.tier, reward: st.reward })));
+                    st.winners.forEach(n => { if(!allW.some(x => x.name===n && x.tier===st.tier)) allW.push({name:n, tier:st.tier, reward:st.reward}); });
+                    t.set(db.collection("history").doc(), {
+                        sessionId: s.sessionId, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        title: `${s.isOfficial?'OFFICIAL':'TEST'} Lottery`, isOfficial: s.isOfficial, winners: allW, hash: Math.random().toString(36).substring(7)
+                    });
+                }
+            });
+        };
+
+        // --- GEMINI SERVICE (Fetch) ---
+        const generateContent = async (base64, apiKey) => {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Extract RPG items from image to JSON: {items:[{visual_id, category, level, price_gold, price_crystals}]}. visual_id=type_color_feature_lvlX." }, { inlineData: { mimeType: "image/png", data: base64 } }] }] })
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error.message);
+            return data.candidates[0].content.parts[0].text.replace(/```json/g,'').replace(/```/g,'');
+        };
+
+        /*******************************************************
+         * COMPONENTS
+         *******************************************************/
+
+        // 1. HELPERS
+        const MoscowClock = () => {
+            const [time, setTime] = useState(new Date());
+            useEffect(() => { const t = setInterval(()=>setTime(new Date()), 1000); return ()=>clearInterval(t); }, []);
+            const ts = time.toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            return <div className="flex gap-4 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5"><div className="flex items-center gap-2 text-cyan-400"><Clock size={14}/><span className="font-mono font-black">{ts}</span><span className="text-[9px] text-slate-500">MSK</span></div></div>;
+        };
+
+        const isBonus = (t) => t === BONUS_TIER_LEVEL;
+        const getTierLabel = (t) => isBonus(t) ? "BONUS" : `${t}G`;
+
+        // 2. LOTTERY COMPONENTS
+        const TierCard = ({ s, active }) => {
+            const { tier, status, winners, reward } = s;
+            const isB = isBonus(tier);
+            const border = isB ? 'border-purple-500' : 'border-amber-400';
+            const shadow = isB ? 'shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'shadow-[0_0_15px_rgba(251,191,36,0.3)]';
+            return (
+                <div className={`relative flex flex-col shrink-0 w-[160px] h-[100px] rounded-xl border overflow-hidden transition-all ${active ? `${border} ${shadow}` : 'border-white/5 opacity-60'} ${status==='rolling'?'animate-pulse':''}`}>
+                    <div className="px-2 py-1.5 flex justify-between bg-black/20 border-b border-white/5">
+                        <span className={`text-sm font-black italic flex items-center gap-1 ${isB?'text-purple-400':'text-emerald-400'}`}>{isB&&<Sparkles size={10}/>}{getTierLabel(tier)}</span>
+                        <span className="text-[9px] font-bold text-slate-400">{reward}💎</span>
+                    </div>
+                    <div className="flex-1 p-1.5 flex flex-col gap-1 overflow-hidden">
+                        {winners.slice(0,3).map((w,i) => <div key={i} className="bg-black/40 px-1.5 py-0.5 rounded border border-white/5 flex items-center gap-1"><User size={8} className="text-slate-500"/><span className="text-[10px] font-bold text-slate-300 truncate font-mono">{w.split('#')[0]}</span></div>)}
+                    </div>
+                </div>
+            );
+        };
+
+        const SlotMachine = ({ target, spinning, onFinish }) => {
+            useEffect(() => { if(spinning) setTimeout(() => onFinish && onFinish(), (2+(target.length-1)*0.4)*1000 + 500); }, [spinning]);
+            const SlotDigit = ({ t, idx }) => {
+                const strip = [...Array(spinning ? 20 : 0).fill([0,1,2,3,4,5,6,7,8,9]).flat(), ...[0,1,2,3,4,5,6,7,8,9].slice(0, parseInt(t)||0 + 1)];
+                return (
+                    <div className="w-20 h-28 bg-[#1a0b0b] rounded-xl border-2 border-amber-500/50 flex flex-col items-center overflow-hidden relative">
+                         <div className="w-full flex flex-col items-center transition-transform duration-[2s]" style={{ transform: `translateY(-${(strip.length-1)*100}%)`, transitionDuration: spinning ? `${2+idx*0.4}s` : '0s' }}>
+                             {strip.map((n,i)=><div key={i} className="h-28 w-full flex items-center justify-center shrink-0"><span className="text-6xl font-black text-amber-300">{n}</span></div>)}
+                         </div>
+                    </div>
+                );
+            }
+            return <div className="flex gap-2 relative z-30">{target.map((t,i)=><SlotDigit key={i} t={t} idx={i}/>)}</div>;
+        };
+
+        const ResultModal = ({ title, winners, reward, onClose, isFinal, onReset, isAdmin }) => {
+            const ref = useRef(null);
+            const copy = async () => { if(window.htmlToImage) { const b = await window.htmlToImage.toBlob(ref.current, {backgroundColor:'#0f172a'}); await navigator.clipboard.write([new ClipboardItem({'image/png':b})]); alert("Copied!"); }};
+            return (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in zoom-in duration-300">
+                    <div ref={ref} className="w-full max-w-md bg-[#0f172a] border-2 border-amber-500/50 rounded-3xl p-8 relative shadow-2xl">
+                        <h2 className="text-3xl font-black text-white uppercase text-center mb-4">{title}</h2>
+                        <div className="space-y-2 mb-8">{winners.map((w,i)=><div key={i} className="bg-amber-500/10 border-l-4 border-amber-500 p-3 rounded-r flex items-center gap-3"><Crown size={16} className="text-black bg-amber-500 rounded-full p-0.5"/><span className="font-black text-xl text-white">{w.split('#')[0]}</span></div>)}</div>
+                        <div className="flex gap-2">
+                            <button onClick={copy} className="flex-1 bg-slate-800 text-white py-3 rounded-xl font-bold uppercase text-xs flex justify-center gap-2"><Copy size={16}/> Copy</button>
+                            <button onClick={onClose} className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold uppercase text-xs">Close</button>
+                            {isFinal && isAdmin && <button onClick={onReset} className="flex-1 bg-red-700 text-white py-3 rounded-xl font-bold uppercase text-xs"><RotateCcw size={16}/></button>}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const LotterySystem = ({ isAdmin, isSound, setIsLocked, Audio }) => {
+            const [s, setS] = useState(null);
+            const [m, setM] = useState([]);
+            const [digits, setDigits] = useState(['?','?','?','?','?']);
+            const [spin, setSpin] = useState(false);
+            const [modal, setModal] = useState({ show: false, type: 'stage' }); // type: stage | final
+
+            useEffect(() => {
+                const u1 = subscribeToLottery(setS);
+                const u2 = db.collection("users").onSnapshot(snap => setM(snap.docs.map(d=>({id:d.id, ...d.data()}))));
+                return () => { u1(); u2(); };
+            }, []);
+
+            useEffect(() => {
+                if(!s) return;
+                setIsLocked(s.status==='rolling'||s.status==='checking');
+                if(s.status==='finished' && !sessionStorage.getItem('shown_'+s.sessionId)) {
+                    setModal({show:true, type:'final'});
+                    sessionStorage.setItem('shown_'+s.sessionId, 'true');
+                    setSpin(false);
+                } else if(s.status==='rolling') {
+                    setSpin(true); setDigits(['?','?','?','?','?']);
+                } else if(s.status==='revealed' && s.lastWinner) {
+                    setDigits((s.lastWinner.name.match(/#(\d+)$/)?.[1]||"00000").split(''));
+                    setSpin(true);
+                } else if(s.status!=='finished') {
+                    setSpin(false); setDigits(['?','?','?','?','?']);
+                }
+            }, [s?.status, s?.updatedAt]);
+
+            const onSpinEnd = () => {
+                if(s?.status==='revealed') { setSpin(false); Audio.speak(`Победитель ${s.lastWinner.name.split('#')[0]}`); }
+            };
+
+            const reset = async () => { if(isAdmin) { await adminResetSession(s.operatorName||"Admin"); setModal({show:false,type:'stage'}); sessionStorage.removeItem('shown_'+s.sessionId); }};
+            
+            if(!s) return <div>Loading...</div>;
+            const tData = s.stages[s.currentTier.toString()];
+            const canRoll = s.status!=='finished' && (s.status==='ready' || (s.status==='revealed' && tData.winners.length < TIER_WINNERS_COUNT[s.currentTier] && !spin));
+            const canFinish = s.status!=='finished' && (tData.winners.length >= TIER_WINNERS_COUNT[s.currentTier] || tData.status==='done');
+            
+            return (
+                <div className="h-full w-full grid grid-cols-[300px_1fr_300px] gap-4 p-4 relative">
+                    {modal.show && <ResultModal 
+                        title={modal.type==='final' ? "ИТОГИ РОЗЫГРЫША" : "ИТОГИ ЭТАПА"} 
+                        winners={modal.type==='final' ? Object.values(s.stages).flatMap(x=>x.winners) : tData.winners} 
+                        reward={modal.type==='stage' ? tData.reward : 0} 
+                        isFinal={modal.type==='final'}
+                        isAdmin={isAdmin}
+                        onClose={()=>setModal({...modal, show:false})} 
+                        onReset={reset} 
+                    />}
+                    
+                    {/* Left Panel */}
+                    <div className="flex flex-col rounded-2xl border border-white/10 bg-[#0a0505]/80 backdrop-blur-md overflow-hidden">
+                        <div className="h-10 px-4 flex items-center justify-between bg-emerald-950/30 border-b border-white/5"><span className="text-[10px] font-black uppercase text-emerald-400">ДОПУЩЕНО: {s.allowed.length}</span></div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">{s.allowed.map((u,i)=><div key={i} className="flex gap-3 bg-[#112520]/40 px-3 py-2 rounded text-sm text-slate-200"><span className="text-green-500 font-bold">{i+1}</span>{u.name.split('#')[0]}</div>)}</div>
+                    </div>
+
+                    {/* Center Arena */}
+                    <div className="flex flex-col gap-4">
+                        <div className="flex-1 relative rounded-3xl border border-amber-500/20 bg-gradient-to-b from-[#1a0f0f] to-[#0a0505] flex flex-col overflow-hidden">
+                            <div className="p-6 flex justify-between">
+                                <div><h2 className="text-3xl font-black text-white italic">RNG ARENA</h2><span className="text-[10px] bg-slate-800 px-2 rounded text-slate-500">{s.status}</span></div>
+                                <div className="text-right"><MoscowClock/><div className="text-4xl font-black text-amber-500 mt-2">{getTierLabel(s.currentTier)}</div></div>
+                            </div>
+                            <div className="flex-1 flex flex-col items-center justify-center relative z-30 pb-10">
+                                {s.status==='idle'||s.status==='checking' ? <div className="text-center"><Gift size={48} className="text-amber-500 mx-auto mb-4"/><h3 className="text-xl font-black text-slate-300">ОЖИДАНИЕ</h3></div> : <div className="flex flex-col items-center gap-8"><SlotMachine target={digits} spinning={spin} onFinish={onSpinEnd} />{s.lastWinner && !spin && <div className="text-4xl font-black text-amber-200 animate-bounce">{s.lastWinner.name.split('#')[0]}</div>}</div>}
+                            </div>
+                            {isAdmin && <div className="absolute bottom-0 inset-x-0 p-4 bg-black/40 flex justify-center gap-4 z-50">
+                                {s.status==='idle' && <button onClick={()=>adminStartCheck(m)} className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl text-xs uppercase">Check</button>}
+                                {s.status==='checking' && <button onClick={()=>adminSetReady()} className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl text-xs uppercase">Ready</button>}
+                                {canRoll && <button onClick={async ()=>{await adminStartRoll(); setTimeout(adminPickWinner, 4000)}} className="px-12 py-3 bg-amber-600 text-white font-bold rounded-xl text-xs uppercase flex items-center gap-2"><Play size={16}/> Roll</button>}
+                                {canFinish && <><button onClick={()=>setModal({show:true,type:'stage'})} className="px-8 py-3 bg-slate-700 text-white font-bold rounded-xl text-xs uppercase flex items-center gap-2"><List size={16}/> Results</button><button onClick={()=>adminNextStage()} className="px-8 py-3 bg-emerald-600 text-white font-bold rounded-xl text-xs uppercase flex items-center gap-2">Next <ChevronRight size={16}/></button></>}
+                                {s.status==='finished' && <button onClick={()=>setModal({show:true,type:'final'})} className="px-8 py-3 bg-slate-700 text-white font-bold rounded-xl text-xs uppercase flex gap-2"><List size={16}/> Final</button>}
+                                {s.status!=='idle' && <button onClick={()=>{if(confirm("Reset?")) reset()}} className="px-4 py-3 bg-red-900/50 text-red-200 rounded-xl"><RotateCcw size={16}/></button>}
+                            </div>}
+                        </div>
+                        <div className="h-[120px] bg-[#0a0505]/50 rounded-xl border border-white/5 p-2 flex items-center gap-3 overflow-x-auto custom-scrollbar px-1">{Object.values(s.stages).sort((a,b)=>a.tier-b.tier).map(st=><TierCard key={st.tier} s={st} active={st.tier===s.currentTier}/>)}</div>
+                    </div>
+
+                    {/* Right Panel */}
+                    <div className="flex flex-col rounded-2xl border border-white/10 bg-[#0a0505]/80 backdrop-blur-md overflow-hidden">
+                        <div className="h-10 px-4 flex items-center justify-between bg-red-950/30 border-b border-white/5"><span className="text-[10px] font-black uppercase text-red-400">ИСКЛЮЧЕНИЯ: {s.rejected.length}</span></div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">{s.rejected.map((u,i)=><div key={i} className="flex flex-col border border-white/5 px-3 py-2 rounded-lg bg-[#1a0505]/60"><div className="flex justify-between"><span className="text-sm font-bold text-slate-300">{u.name.split('#')[0]}</span>{u.reason==='WINNER' && <Trophy size={12} className="text-amber-500"/>}</div><span className="text-[9px] text-red-500/70 font-bold uppercase">{u.reason}</span></div>)}</div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 3. GUILD MANAGER
+        const GuildManager = ({ isAdmin }) => {
+            const [m, setM] = useState([]);
+            const [q, setQ] = useState("");
+            const [add, setAdd] = useState({ name: "", base: "", intermediate: "", final: "" });
+            const [showAdd, setShowAdd] = useState(false);
+            
+            useEffect(() => db.collection("users").onSnapshot(s => setM(s.docs.map(d=>({id:d.id, ...d.data()})))), []);
+
+            const calcDiff = u => { const cur = u.final>0?u.final:(u.intermediate>0?u.intermediate:u.base); return Math.max(0, cur - u.base); };
+            const sorted = m.filter(u=>u.name.toLowerCase().includes(q.toLowerCase())).sort((a,b)=>calcDiff(b)-calcDiff(a));
+            
+            const handleAdd = async () => { if(add.name){ await db.collection("users").add({name:add.name, base:Number(add.base)||0, intermediate:Number(add.intermediate)||0, final:Number(add.final)||0}); setAdd({name:"",base:"",intermediate:"",final:""}); setShowAdd(false); }};
+            const update = async (id, d) => await db.collection("users").doc(id).update(d);
+            const del = async (id) => { if(confirm("Del?")) await db.collection("users").doc(id).delete(); };
+
+            return (
+                <div className="h-full flex flex-col p-2 gap-2 bg-[#0B1026] relative">
+                    <div className="flex gap-2 z-10">
+                         {isAdmin && <button onClick={()=>setShowAdd(!showAdd)} className="bg-emerald-600 px-4 py-2 rounded text-white text-xs font-bold uppercase"><Plus size={14}/></button>}
+                         <div className="relative flex-1"><Search className="absolute left-3 top-2 text-slate-500" size={14}/><input value={q} onChange={e=>setQ(e.target.value)} className="w-full bg-[#131b36]/60 border border-white/10 rounded pl-9 py-1.5 text-xs text-white"/></div>
+                    </div>
+                    {showAdd && isAdmin && <div className="bg-[#0f172a] border border-emerald-500/30 p-4 rounded z-20 flex flex-col gap-2">
+                        <input value={add.name} onChange={e=>setAdd({...add, name:e.target.value})} placeholder="Name" className="bg-black/40 border border-white/10 p-2 text-white text-xs"/>
+                        <div className="flex gap-2"><input type="number" value={add.base} onChange={e=>setAdd({...add, base:e.target.value})} placeholder="Base" className="bg-black/40 border border-white/10 p-2 text-white text-xs flex-1"/><input type="number" value={add.intermediate} onChange={e=>setAdd({...add, intermediate:e.target.value})} placeholder="Inter" className="bg-black/40 border border-white/10 p-2 text-white text-xs flex-1"/><input type="number" value={add.final} onChange={e=>setAdd({...add, final:e.target.value})} placeholder="Final" className="bg-black/40 border border-white/10 p-2 text-white text-xs flex-1"/></div>
+                        <button onClick={handleAdd} className="bg-emerald-600 text-white py-2 text-xs font-bold uppercase">Save</button>
+                    </div>}
+                    <div className="flex-1 bg-[#0f172a]/80 border border-white/5 rounded-xl overflow-hidden flex flex-col z-10">
+                        <div className="grid grid-cols-[40px_1fr_1fr_1fr_1fr_1fr_30px] gap-2 px-4 py-2 bg-[#131b36] text-[10px] font-bold uppercase text-slate-500"><div>#</div><div>Nick</div><div className="text-right">Base</div><div className="text-right">Inter</div><div className="text-right">Final</div><div className="text-right text-emerald-500">Diff</div><div></div></div>
+                        <div className="overflow-y-auto custom-scrollbar flex-1">{sorted.map((u,i)=>(
+                            <div key={u.id} className="grid grid-cols-[40px_1fr_1fr_1fr_1fr_1fr_30px] gap-2 px-4 py-1 items-center hover:bg-white/5 border-b border-white/5 text-sm">
+                                <div className="font-mono text-slate-500">{i+1}</div>
+                                <input value={u.name} onChange={e=>isAdmin&&update(u.id,{name:e.target.value})} disabled={!isAdmin} className="bg-transparent text-slate-200 font-bold w-full"/>
+                                <input type="number" value={u.base} onChange={e=>isAdmin&&update(u.id,{base:Number(e.target.value)})} disabled={!isAdmin} className="bg-transparent text-right text-slate-500 w-full"/>
+                                <input type="number" value={u.intermediate} onChange={e=>isAdmin&&update(u.id,{intermediate:Number(e.target.value)})} disabled={!isAdmin} className="bg-transparent text-right text-slate-400 w-full"/>
+                                <input type="number" value={u.final} onChange={e=>isAdmin&&update(u.id,{final:Number(e.target.value)})} disabled={!isAdmin} className="bg-transparent text-right text-slate-300 font-bold w-full"/>
+                                <div className="text-right font-mono text-emerald-400">{calcDiff(u).toLocaleString()}</div>
+                                <div className="text-right">{isAdmin&&<button onClick={()=>del(u.id)} className="text-red-500"><Trash2 size={12}/></button>}</div>
+                            </div>
+                        ))}</div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 4. ARCHIVE
+        const ArchiveManager = () => {
+            const [h, setH] = useState([]);
+            useEffect(() => db.collection("history").orderBy("timestamp", "desc").onSnapshot(s => setH(s.docs.map(d=>({id:d.id, ...d.data()})))), []);
+            const del = async (id) => { if(confirm("Del?")) await db.collection("history").doc(id).delete(); };
+            return (
+                <div className="h-full p-4 overflow-y-auto custom-scrollbar">
+                    <h2 className="text-2xl font-black text-slate-200 mb-4 flex items-center gap-2"><Archive/> АРХИВ</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {h.map(item => (
+                            <div key={item.id} className="bg-[#0f172a]/60 border border-white/10 rounded-xl p-4">
+                                <div className="flex justify-between mb-2"><span className="text-xs text-slate-500 font-bold">{item.timestamp ? new Date(item.timestamp.seconds*1000).toLocaleDateString() : 'N/A'}</span><button onClick={()=>del(item.id)}><Trash2 size={14}/></button></div>
+                                <h3 className="text-lg font-bold text-slate-200">{item.title}</h3>
+                                <div className="mt-2 space-y-1">{item.winners?.map((w,i)=><div key={i} className="bg-white/5 px-2 py-1 rounded text-sm flex justify-between"><span>{w.name}</span><span className="text-amber-500">{w.reward}💎</span></div>)}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // 5. APP ROOT
+        const App = () => {
+            const [tab, setTab] = useState('stats');
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [showLogin, setShowLogin] = useState(false);
+            const [pass, setPass] = useState("");
+
+            const login = (e) => { e.preventDefault(); if(pass===ACCESS_CODE){ setIsAdmin(true); setShowLogin(false); } else alert("Wrong"); };
+
+            return (
+                <div className="min-h-screen bg-[#020617] text-slate-200 font-sans flex flex-col relative overflow-hidden">
+                    <div className="fixed inset-0 pointer-events-none z-0">{[...Array(20)].map((_,i)=><div key={i} className="snowflake" style={{left:Math.random()*100+'vw', animationDuration: 5+Math.random()*5+'s', opacity:0.3}}>❄</div>)}</div>
+                    
+                    <nav className="relative z-50 bg-[#0f172a]/90 backdrop-blur-md border-b border-white/10 px-4 py-3 flex items-center justify-between shadow-md">
+                        <div className="flex items-center gap-2"><div className="w-8 h-8 rounded bg-red-700 flex items-center justify-center font-bold text-white">G</div><span className="font-bold hidden sm:block">GUILD IONIA</span></div>
+                        <div className="flex gap-2 bg-[#0f172a] p-1 rounded-full border border-white/10">
+                            {[ {id:'stats',l:'Stats',i:Users}, {id:'lottery',l:'Loto',i:Gift}, {id:'archive',l:'Archive',i:Archive}, {id:'market',l:'Scan',i:ScanLine} ].map(t => (
+                                <button key={t.id} onClick={()=>setTab(t.id)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase flex items-center gap-2 ${tab===t.id?'bg-slate-700 text-white':'text-slate-500 hover:text-slate-300'}`}>{t.id==='market'&&!isAdmin?<Lock size={12}/>:<t.i size={14}/>} {t.l}</button>
+                            ))}
+                        </div>
+                        <button onClick={()=>isAdmin?setIsAdmin(false):setShowLogin(true)} className={`px-3 py-1 text-[10px] font-bold uppercase border rounded ${isAdmin?'text-red-300 border-red-500/30':'text-slate-400 border-slate-700'}`}>{isAdmin?"Exit":"Admin"}</button>
+                    </nav>
+
+                    <main className="flex-1 relative z-10 overflow-hidden pt-4 p-2">
+                        <div className="h-full max-w-[1920px] mx-auto">
+                            {tab==='stats' && <GuildManager isAdmin={isAdmin}/>}
+                            {tab==='lottery' && <LotterySystem isAdmin={isAdmin} isSound={true} setIsLocked={()=>{}} Audio={AudioController} />}
+                            {tab==='archive' && <ArchiveManager/>}
+                            {tab==='market' && (isAdmin ? <div className="p-4 text-center">Experimental Manager Placeholder (See logic in script)</div> : <div className="h-full flex items-center justify-center text-slate-500"><Lock size={48} className="mb-4"/><p>Admin Only</p></div>)}
+                        </div>
+                    </main>
+                    
+                    {showLogin && <div className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4">
+                        <div className="bg-[#0f172a] border border-cyan-500/30 p-6 rounded-2xl w-full max-w-sm text-center">
+                            <Lock size={32} className="text-cyan-400 mx-auto mb-4"/><h3 className="text-white font-bold uppercase mb-4">Admin Access</h3>
+                            <form onSubmit={login}><input type="password" value={pass} onChange={e=>setPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded p-3 text-center text-white mb-4" placeholder="Code"/><button className="w-full bg-cyan-600 text-white font-bold py-3 rounded uppercase text-xs">Login</button></form>
+                            <button onClick={()=>setShowLogin(false)} className="mt-4 text-xs text-slate-500">Cancel</button>
+                        </div>
+                    </div>}
+                </div>
+            );
+        };
+
+        // RENDER
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
