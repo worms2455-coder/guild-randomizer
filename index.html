@@ -1,1066 +1,534 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guild Ionia - Sync System</title>
+    <title>GuildMaster Randomizer (Standalone)</title>
     
-    <!-- Tailwind CSS -->
+    <!-- 1. Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Import Map -->
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.2.0",
-        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.344.0",
-        "canvas-confetti": "https://esm.sh/canvas-confetti@1.6.0?external=react,react-dom",
-        "react-snowfall": "https://esm.sh/react-snowfall@2.1.0?external=react,react-dom",
-        "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'xmas-gold': '#fbbf24',
+              'xmas-red': '#ef4444',
+              'xmas-red_dark': '#b91c1c',
+              'xmas-green': '#22c55e',
+            }
+          }
+        }
       }
-    }
     </script>
+
+    <!-- 2. React 18 & ReactDOM (UMD) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- Babel -->
+    <!-- 3. Babel Standalone (Compiles JSX in browser) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        slate: { 850: '#151e32', 900: '#0f172a', 950: '#020617' },
-                        amber: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' }
-                    },
-                    fontFamily: {
-                        mono: ['Consolas', 'Monaco', 'Courier New', 'monospace'],
-                    },
-                }
-            }
-        }
-        
-        // Polyfill for process
-        window.process = { env: { NODE_ENV: 'production' } };
-        
-        // Robust Error Handler
-        window.onerror = function(message, source, lineno, colno, error) {
-            const errDiv = document.createElement('div');
-            errDiv.style.position = 'fixed';
-            errDiv.style.top = '0';
-            errDiv.style.left = '0';
-            errDiv.style.width = '100%';
-            errDiv.style.background = '#ef4444';
-            errDiv.style.color = 'white';
-            errDiv.style.padding = '20px';
-            errDiv.style.zIndex = '99999';
-            errDiv.style.fontFamily = 'monospace';
-            errDiv.style.whiteSpace = 'pre-wrap';
-            errDiv.innerHTML = '<strong>CRITICAL ERROR:</strong><br>' + message + '<br><small>' + source + ':' + lineno + '</small><br><pre>' + (error ? error.stack : '') + '</pre>';
-            document.body.appendChild(errDiv);
-            console.error(error);
-        };
-    </script>
+    <!-- 4. Firebase Compat (v9/10) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <!-- 5. Libraries (Lucide, Recharts, Html-to-image) -->
+    <script src="https://unpkg.com/lucide-react@0.300.0/dist/umd/lucide-react.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.10.3/umd/Recharts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
 
     <style>
-        /* CRITICAL: Ensure pixel-perfect height calculations */
-        *, *::before, *::after { box-sizing: border-box; }
-
-        body { background-color: #0f172a; color: white; font-family: 'Segoe UI', sans-serif; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        .excel-input { width: 100%; height: 100%; background: transparent; border: none; outline: none; text-align: right; font-family: 'Courier New', monospace; }
-        .excel-input:disabled { background: transparent; color: #334155; cursor: not-allowed; }
-        .spin-blur { filter: blur(2px); }
-        
-        /* Animations */
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
-        
-        @keyframes zoomIn {
-            from { transform: scale(0.8); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-        .animate-zoom-in { animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-
-        /* --- DARK THEME TABLE CSS --- */
-        .dark-theme-table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: #1a1d2e;
-            color: #e0e0e0;
-            font-size: 14px;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-
-        /* Шапка таблицы */
-        .dark-theme-table thead th {
-            background-color: #252a40;
-            color: #aab0c5;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 12px;
-            padding: 16px 12px;
-            text-align: left;
-            border-bottom: 2px solid #303650;
-        }
-
-        /* Выделение колонки ИТОГОВЫЙ */
-        .dark-theme-table thead th.header-highlight {
-            background-color: #3a2a3a;
-            color: #ffadd0;
-            border-bottom-color: #5a3a4a;
-        }
-
-        /* Строки и ячейки */
-        .dark-theme-table tbody td {
-            padding: 12px;
-            border-bottom: 1px solid #2a2f45;
-            vertical-align: middle;
-        }
-        .dark-theme-table tbody tr:hover {
-            background-color: #2a2f45;
-        }
-
-        /* Цифры (деньги) */
-        .col-number {
-            font-family: 'Roboto Mono', monospace; 
-            text-align: right;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        /* Цвет для плюсовой разницы */
-        .col-diff {
-            color: #4fd1c5;
-        }
-
-        /* Исправление Тиров (Badges) */
-        .cell-tiers {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-wrap: nowrap; 
-            overflow-x: auto;  
-            max-width: 300px; 
-            scrollbar-width: none; 
-        }
-        .cell-tiers::-webkit-scrollbar { display: none; }
-
-        .tier-badge {
-            background-color: rgba(79, 209, 197, 0.15);
-            color: #4fd1c5;
-            border: 1px solid rgba(79, 209, 197, 0.3);
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 700;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-
-        /* Input Styles for Dark Theme */
-        .dark-input {
-            width: 100%;
-            background: transparent;
-            border: none;
-            outline: none;
-            text-align: right;
-            color: #ffadd0;
-            font-family: 'Roboto Mono', monospace;
-            font-weight: bold;
-        }
-        .dark-input:focus {
-            background: rgba(255,255,255,0.05);
-            border-radius: 4px;
-        }
-        .dark-input:disabled {
-            color: #5a5a6a;
-            cursor: not-allowed;
-        }
-
-        /* --- LOTTERY PAGE STYLES --- */
-        .cta-button {
-            background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%);
-            border: none;
-            box-shadow: 0 4px 14px rgba(237, 137, 54, 0.4);
-            transition: all 0.2s ease;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            font-weight: 800;
-        }
-        .cta-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(237, 137, 54, 0.6);
-        }
-        .cta-button:active:not(:disabled) {
-            transform: translateY(1px);
-        }
-        .cta-button:disabled {
-            background: #475569;
-            box-shadow: none;
-            cursor: not-allowed;
-            opacity: 0.5;
-        }
-
-        .winner-name {
-            font-size: 2.5rem;
-            font-weight: 900;
-            background: -webkit-linear-gradient(#fff, #ffd700);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        @keyframes popIn {
-            0% { opacity: 0; transform: scale(0.5); }
-            100% { opacity: 1; transform: scale(1); }
-        }
-
-        .participant-card {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            margin-bottom: 4px; /* Reduced margin */
-            transition: background 0.2s;
-        }
-        .participant-card:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-
-        .chance-badge {
-            color: #a0aec0;
-            font-size: 0.75rem;
-            font-family: 'Roboto Mono', monospace;
-            background: rgba(0, 0, 0, 0.2);
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-
-        .history-item {
-            border-left: 3px solid #ed8936;
-            background: linear-gradient(90deg, rgba(237, 137, 54, 0.1) 0%, rgba(0,0,0,0) 100%);
-            margin-bottom: 6px;
-        }
-        
-        /* ROULETTE MASK (FOG EFFECT) - Updated for sharper focus */
-        .roulette-mask {
-            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%);
-            mask-image: linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%);
-        }
-
-        /* --- CHANGELOG STYLES --- */
-        .changelog-container {
-          padding: 20px;
-          max-width: 800px;
-          margin: 0 auto;
-          color: #e2e8f0;
-        }
-        .version-card {
-          background: #1a1d2e;
-          border: 1px solid #2d3748;
-          border-radius: 12px;
-          padding: 24px;
-          margin-bottom: 20px;
-          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .version-title {
-          font-size: 1.5rem;
-          color: #f6ad55; /* Оранжевый акцент */
-          margin-bottom: 16px;
-          border-bottom: 1px solid #2d3748;
-          padding-bottom: 10px;
-        }
-        .change-list li {
-          margin-bottom: 8px;
-          line-height: 1.6;
-        }
-        .category-badge {
-          color: #63b3ed; /* Голубой для категорий */
-          font-weight: bold;
-        }
-        
-        /* --- TIMER STYLES --- */
-        .timer-container {
-          display: flex;
-          justify-content: center;
-          gap: 20px;
-          background: rgba(0, 0, 0, 0.3);
-          padding: 15px;
-          border-radius: 12px;
-          border: 1px solid rgba(246, 173, 85, 0.2);
-          margin: 20px auto;
-          max-width: 600px;
-        }
-        .time-block {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-        .time-value {
-          font-size: 2rem;
-          font-weight: bold;
-          color: #f6ad55;
-          font-family: monospace;
-        }
-        .time-label {
-          font-size: 0.75rem;
-          color: #a0aec0;
-          text-transform: uppercase;
-        }
+        body { margin: 0; padding: 0; background-color: #020617; color: #e2e8f0; overflow: hidden; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+        @keyframes snow { 0% { transform: translateY(-10vh); } 100% { transform: translateY(100vh); } }
+        .snowflake { position: fixed; top: -10px; color: white; animation: snow 10s linear infinite; pointer-events: none; }
     </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "html-to-image": "https://esm.sh/html-to-image@^1.11.13",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "firebase/": "https://esm.sh/firebase@^12.7.0/"
+  }
+}
+</script>
 </head>
 <body>
     <div id="root"></div>
 
-    <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useRef } from 'react';
-        import { createRoot } from 'react-dom/client';
-        import { Lock, Unlock, Trophy, Archive, Table as TableIcon, Upload, Save, Copy, X, Calendar, ChevronDown, ChevronUp, Trash2, UserPlus, Eye, ShieldAlert, History, Bell, PartyPopper, RefreshCw, Megaphone, Volume2, VolumeX, Download, Info, CheckCircle2, Wrench } from 'lucide-react';
-        import confetti from 'canvas-confetti';
-        import Snowfall from 'react-snowfall';
+    <!-- MAIN APP SCRIPT -->
+    <script type="text/babel" data-presets="react,typescript">
+        /*******************************************************
+         * GLOBAL IMPORTS & CONFIG
+         *******************************************************/
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
         
-        // --- FIREBASE CONFIGURATION ---
-        import { initializeApp } from "firebase/app";
-        import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, query, orderBy, limit, updateDoc } from "firebase/firestore";
+        // Destructure Icons
+        const { 
+            Users, Gift, ScanLine, Archive, Lock, Unlock, X, ChevronRight, AlertCircle, 
+            Volume2, VolumeX, Search, Plus, Save, Trash2, ArrowRight, Activity, Target, 
+            Camera, Image: ImageIcon, Settings, Clock, Check, Play, Trophy, RotateCcw, 
+            Copy, List, Loader2, Sparkles, User, CheckCircle2, ShieldAlert, Zap, 
+            Diamond, Coins, Package, Tag, Swords, Shield, Gem, TrendingUp, TrendingDown, 
+            Crosshair, Info, Scale, ArrowRightLeft, Calculator, ShieldCheck, Siren, 
+            History, Calendar, Hash
+        } = lucideReact;
 
+        // Destructure Recharts
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } = Recharts;
+
+        // Firebase Configuration
         const firebaseConfig = {
-          apiKey: "AIzaSyCIFKGZioiflKAAA1tHkIZV0u1sMiPzUjo",
-          authDomain: "random-3fbaa.firebaseapp.com",
-          projectId: "random-3fbaa",
-          storageBucket: "random-3fbaa.firebasestorage.app",
-          messagingSenderId: "891768940412",
-          appId: "1:891768940412:web:312585e31aade1d7df66f9"
+            apiKey: "AIzaSyCIFKGZioiflKAAA1tHkIZV0u1sMiPzUjo",
+            authDomain: "random-3fbaa.firebaseapp.com",
+            projectId: "random-3fbaa",
+            storageBucket: "random-3fbaa.firebasestorage.app",
+            messagingSenderId: "891768940412",
+            appId: "1:891768940412:web:312585e31aade1d7df66f9"
         };
 
-        let app, db;
+        let db;
         try {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            console.log("Firebase initialized successfully");
         } catch (e) {
-            console.error("Firebase init error", e);
-            throw new Error("Failed to initialize Firebase: " + e.message);
+            document.body.insertAdjacentHTML('afterbegin', `<div style="background:#ef4444;color:white;padding:10px;text-align:center;z-index:9999;position:fixed;top:0;left:0;right:0">FIREBASE ERROR: ${e.message}</div>`);
         }
 
-        // --- CONSTANTS ---
-        const DEMO_DATA = [
-            { id: '1', name: "Фасоль#51817", base: 150818174500, final: null, intermediate: null },
-            { id: '2', name: "Мяу#97418", base: 723767374500, final: null, intermediate: null },
-            { id: '3', name: "dimandorf#98147", base: 347739374500, final: null, intermediate: null },
-            { id: '4', name: "Nezhdanchick#90542", base: 121985674500, final: null, intermediate: null },
-            { id: '5', name: "Дэментор#5030", base: 375947374500, final: null, intermediate: null },
-            { id: '6', name: "Adanei#72323", base: 60665339100, final: null, intermediate: null },
-            { id: '7', name: "Асула#92795", base: 241222674500, final: null, intermediate: null },
-            { id: '8', name: "Shadow#24330", base: 97337374500, final: null, intermediate: null },
-            { id: '9', name: "selfaa#67769", base: 243840424500, final: null, intermediate: null },
-            { id: '10', name: "Mihaqlovich#89594", base: 500117374500, final: null, intermediate: null },
-            { id: '11', name: "Zarya#88899", base: 641617374500, final: null, intermediate: null },
-            { id: '12', name: "INKI#33936", base: 358867374500, final: null, intermediate: null },
-            { id: '13', name: "Rainer#73242", base: 462659374500, final: null, intermediate: null },
-            { id: '14', name: "Алена#20153", base: 284313374500, final: null, intermediate: null },
-            { id: '15', name: "Алекс#46688", base: 920007374500, final: null, intermediate: null },
-            { id: '16', name: "Калямбус#3224", base: 88030874500, final: null, intermediate: null },
-            { id: '17', name: "Aver1n#93710", base: 125861370700, final: null, intermediate: null },
-            { id: '18', name: "Сатана#38064", base: 307767374500, final: null, intermediate: null },
-            { id: '19', name: "Nipi#58068", base: 163467488400, final: null, intermediate: null },
-            { id: '20', name: "YuryQ#38320", base: 617395374500, final: null, intermediate: null }
-        ];
+        // Constants
+        const ACCESS_CODE = "7777";
+        const BONUS_TIER_LEVEL = 999;
+        const OFFICIAL_START_DATE_ISO = "2026-01-01T21:00:00+03:00";
+        const OFFICIAL_START_TIMESTAMP = new Date(OFFICIAL_START_DATE_ISO).getTime();
+        const SESSION_DOC_ID = "ACTIVE";
 
-        const TIERS = [15, 25, 50, 75, 100, 125];
-        const TIER_PRIZES = { 15: 120, 25: 180, 50: 400, 75: 600, 100: 900, 125: 2000 };
-        const TIER_COUNTS = { 15: 3, 25: 2, 50: 1, 75: 1, 100: 1, 125: 1 };
+        const TIERS_CONFIG = [15, 25, 50, 75, 100, 125, BONUS_TIER_LEVEL];
+        const TIER_REWARDS = { 15: 120, 25: 180, 50: 400, 75: 600, 100: 900, 125: 2000, [BONUS_TIER_LEVEL]: 690 };
+        const TIER_WINNERS_COUNT = { 15: 3, 25: 2, 50: 1, 75: 1, 100: 1, 125: 1, [BONUS_TIER_LEVEL]: 2 };
+
+        const INITIAL_STAGES_CONFIG = {
+            "15": { tier: 15, winnersCount: 3, reward: 120, status: 'locked', winners: [] },
+            "25": { tier: 25, winnersCount: 2, reward: 180, status: 'locked', winners: [] },
+            "50": { tier: 50, winnersCount: 1, reward: 400, status: 'locked', winners: [] },
+            "75": { tier: 75, winnersCount: 1, reward: 600, status: 'locked', winners: [] },
+            "100": { tier: 100, winnersCount: 1, reward: 900, status: 'locked', winners: [] },
+            "125": { tier: 125, winnersCount: 1, reward: 2000, status: 'locked', winners: [] },
+            [BONUS_TIER_LEVEL.toString()]: { tier: BONUS_TIER_LEVEL, winnersCount: 2, reward: 690, status: 'locked', winners: [] },
+        };
+
+        const AudioController = {
+            playTick: () => {},
+            speak: (text) => { if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(text); u.lang = 'ru-RU'; window.speechSynthesis.speak(u); }},
+            playSuccess: () => {},
+            playMagic: () => {},
+        };
+
+        /*******************************************************
+         * SERVICES (Compat Shim)
+         *******************************************************/
         
-        // --- SOUND ASSETS ---
-        const AUDIO_URLS = {
-            click: "https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3",
-            spin: "https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3",
-            win: "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3"
-        };
+        // --- LOTTERY LOGIC (Ported from modular to compat) ---
+        const subscribeToLottery = (cb) => db.collection("lotterySessions").doc(SESSION_DOC_ID).onSnapshot(s => cb(s.exists ? s.data() : null));
 
-        // --- UTILS ---
-        const fmt = (n) => new Intl.NumberFormat('ru-RU').format(n);
-        const getDiff = (m) => {
-            const cur = m.final !== null && m.final !== undefined ? m.final : (m.intermediate !== null && m.intermediate !== undefined ? m.intermediate : m.base);
-            const diff = cur - m.base;
-            return diff < 0 ? 0 : diff;
-        };
-        const getTierG = (diff) => Math.floor(diff / 1_000_000_000);
-        
-        // Format timestamp with millis
-        const fmtTimeFull = (ts) => {
-            const date = new Date(ts);
-            return date.toLocaleTimeString("ru-RU", { hour12: false, timeZone: "Europe/Moscow" }) + '.' + date.getMilliseconds().toString().padStart(3, '0');
-        };
-
-        // --- COMPONENTS ---
-        const CountdownTimer = () => {
-            const [timeLeft, setTimeLeft] = useState(null);
-            useEffect(() => {
-                const targetDate = new Date("2026-01-01T21:00:00+03:00").getTime();
-                const calculate = () => {
-                    const now = new Date().getTime();
-                    const distance = targetDate - now;
-                    if (distance < 0) { setTimeLeft(null); return; }
-                    const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-                    const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                    const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                    const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-                    setTimeLeft({ days, hours, minutes, seconds });
-                };
-                calculate();
-                const interval = setInterval(calculate, 1000);
-                return () => clearInterval(interval);
-            }, []);
-            if (!timeLeft) return <div className="timer-container"><div className="text-2xl font-black text-amber-500 animate-pulse">РОЗЫГРЫШ НАЧАЛСЯ!</div></div>;
-            const format = (n) => n < 10 ? `0${n}` : n;
-            return (
-                <div className="timer-container animate-in fade-in slide-in-from-top-4 duration-700">
-                    <div className="time-block"><div className="time-value">{format(timeLeft.days)}</div><div className="time-label">ДН</div></div>
-                    <div className="text-2xl text-slate-600 font-bold self-start mt-2">:</div>
-                    <div className="time-block"><div className="time-value">{format(timeLeft.hours)}</div><div className="time-label">ЧАС</div></div>
-                    <div className="text-2xl text-slate-600 font-bold self-start mt-2">:</div>
-                    <div className="time-block"><div className="time-value">{format(timeLeft.minutes)}</div><div className="time-label">МИН</div></div>
-                    <div className="text-2xl text-slate-600 font-bold self-start mt-2">:</div>
-                    <div className="time-block"><div className="time-value">{format(timeLeft.seconds)}</div><div className="time-label">СЕК</div></div>
-                </div>
-            );
-        };
-        const ToastContainer = ({ toasts, removeToast }) => {
-            return (
-                <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
-                    {toasts.map(toast => (
-                        <div key={toast.id} className={`flex items-center gap-3 p-4 rounded-lg shadow-2xl border-l-4 min-w-[300px] animate-slide-in pointer-events-auto ${toast.type === 'win' ? 'bg-slate-800 border-amber-500' : (toast.type === 'error' ? 'bg-slate-800 border-red-500' : 'bg-slate-800 border-blue-500')}`}>
-                            <div className={`p-2 rounded-full ${toast.type === 'win' ? 'bg-amber-500/10 text-amber-500' : (toast.type === 'error' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500')}`}>{toast.type === 'win' ? <Trophy size={20} /> : (toast.type === 'error' ? <ShieldAlert size={20}/> : <Bell size={20} />)}</div>
-                            <div><h4 className={`font-bold text-sm ${toast.type === 'win' ? 'text-amber-500' : (toast.type === 'error' ? 'text-red-400' : 'text-blue-400')}`}>{toast.title}</h4><p className="text-white text-sm">{toast.message}</p></div>
-                            <button onClick={() => removeToast(toast.id)} className="ml-auto text-slate-500 hover:text-white"><X size={16} /></button>
-                        </div>
-                    ))}
-                </div>
-            );
-        };
-        const WinnerOverlay = ({ winner, onClose, role }) => {
-            useEffect(() => {
-                if(winner) {
-                    const count = 200;
-                    const defaults = { origin: { y: 0.7 } };
-                    function fire(particleRatio, opts) { confetti(Object.assign({}, defaults, opts, { particleCount: Math.floor(count * particleRatio) })); }
-                    fire(0.25, { spread: 26, startVelocity: 55 });
-                    fire(0.2, { spread: 60 });
-                    fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
-                    fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
-                    fire(0.1, { spread: 120, startVelocity: 45 });
-                }
-            }, [winner]);
-            if (!winner) return null;
-            return (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300" onClick={onClose}>
-                    <div className="bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-amber-500 rounded-2xl p-8 max-w-md w-full text-center shadow-[0_0_50px_rgba(245,158,11,0.5)] transform scale-100 animate-zoom-in" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-center mb-6"><div className="bg-amber-500/20 p-6 rounded-full ring-4 ring-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.4)]"><Trophy size={64} className="text-amber-500 drop-shadow-lg" /></div></div>
-                        <h2 className="text-3xl font-black text-white uppercase tracking-widest mb-2 drop-shadow-md">ПОБЕДА!</h2>
-                        <div className="text-amber-500 text-lg font-bold mb-6 uppercase tracking-wide border-b border-amber-500/30 pb-4 mx-10">{winner.tier}G РАУНД</div>
-                        <div className="bg-slate-950/50 rounded-xl p-6 mb-8 border border-slate-700 shadow-inner">
-                            <div className="text-3xl md:text-4xl font-black text-white mb-2 drop-shadow-md truncate">{winner.name}</div>
-                            <div className="text-2xl font-mono text-amber-400 font-bold drop-shadow flex justify-center items-center gap-2"><PartyPopper size={24}/> +{winner.prize} 💎</div>
-                        </div>
-                        <button onClick={onClose} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 font-black text-xl uppercase rounded-xl transition shadow-lg transform active:scale-95">{(role === 'ADMIN' || role === 'TESTER') ? 'ПРОДОЛЖИТЬ (ЗАКРЫТЬ У ВСЕХ)' : 'ЗАКРЫТЬ'}</button>
-                    </div>
-                </div>
-            )
-        };
-        const LoginModal = ({ isOpen, onClose, onLogin }) => {
-            if (!isOpen) return null;
-            const [password, setPassword] = useState("");
-            const [error, setError] = useState("");
-            const handleSubmit = (e) => {
-                e.preventDefault(); setError("");
-                if (password === "GM123") { onLogin("ADMIN"); setPassword(""); } else if (password === "TESTER") { onLogin("TESTER"); setPassword(""); } else { setError("Неверный пароль"); }
-            };
-            return (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <form onSubmit={handleSubmit} className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative">
-                        <button type="button" onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white transition"><X size={20} /></button>
-                        <div className="flex flex-col items-center mb-6"><div className="bg-amber-500/10 p-3 rounded-full mb-3"><Lock className="text-amber-500" size={32} /></div><h3 className="text-xl font-bold text-white uppercase tracking-wide">Вход в систему</h3></div>
-                        <div className="space-y-4">
-                            <div><input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500 transition" placeholder="Пароль..." autoFocus />{error && <p className="text-red-500 text-xs mt-2 font-bold flex items-center gap-1"><ShieldAlert size={12}/> {error}</p>}</div>
-                            <div className="grid grid-cols-2 gap-3"><button type="button" onClick={onClose} className="px-4 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-lg transition">Отмена</button><button type="submit" className="px-4 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-900 font-bold rounded-lg shadow-lg transition transform active:scale-95">Войти</button></div>
-                        </div>
-                    </form>
-                </div>
-            );
-        };
-        const MoscowClock = () => {
-            const [dt, setDt] = useState({ date: "", time: "" });
-            useEffect(() => {
-                const tick = () => {
-                    const now = new Date();
-                    setDt({ date: now.toLocaleDateString("ru-RU", { timeZone: "Europe/Moscow" }), time: now.toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" }) });
-                };
-                tick(); const int = setInterval(tick, 1000); return () => clearInterval(int);
-            }, []);
-            return (
-                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-30 pointer-events-none select-none">
-                     <div className="flex items-center gap-2 text-amber-200 text-sm font-bold uppercase tracking-widest drop-shadow-md"><Calendar size={14} />{dt.date}</div>
-                    <div className="text-4xl font-black text-amber-500 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-mono leading-none mt-1">{dt.time}</div>
-                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Москва (UTC+3)</div>
-                </div>
-            );
-        };
-        const ChangelogView = () => (
-            <div className="changelog-container">
-                <h2 className="text-2xl font-bold mb-6 text-white uppercase tracking-wider text-center">История Обновлений</h2>
-                
-                <div className="version-card">
-                     <h3 className="version-title font-black">v0.3 — UI Polish & Logic <span className="text-xs text-slate-500 float-right mt-2">26.11.2024</span></h3>
-                     <ul className="change-list text-sm text-slate-300 list-disc pl-5">
-                        <li><span className="category-badge">🎯 Рулетка:</span> Эффект "Тумана" (Focus Mask) для концентрации на победителе.</li>
-                        <li><span className="category-badge">👥 Интерфейс:</span> Сетка участников (Grid View) для компактности.</li>
-                        <li><span className="category-badge">🔄 Логика:</span> Исправлена кнопка Сброс (полный перезапуск без перезагрузки страницы).</li>
-                        <li><span className="category-badge">🛠️ Debug:</span> Добавлена кнопка проверки пула участников перед запуском.</li>
-                     </ul>
-                </div>
-
-                <div className="version-card">
-                    <h3 className="version-title font-black">v0.2 — The Fairness Update <span className="text-xs text-slate-500 float-right mt-2">24.11.2024</span></h3>
-                    <ul className="change-list text-sm text-slate-300 list-disc pl-5">
-                        <li><span className="category-badge">⚖️ Баланс:</span> Полный переход на систему <strong>Равных Шансов</strong>. Вклад влияет только на допуск к тиру.</li>
-                        <li><span className="category-badge">🎰 Рулетка 2.0:</span> Новый дизайн "Вертикальный Слот". Победитель может выигрывать многократно.</li>
-                        <li><span className="category-badge">🔄 Синхронизация:</span> Мгновенная запись в Архив. Синхронное закрытие окон.</li>
-                    </ul>
-                </div>
-            </div>
-        );
-
-        const LogsView = ({ logs }) => {
-            const [expandedId, setExpandedId] = useState(null);
-            
-            const getTypeStyle = (type) => {
-                switch(type) {
-                    case 'WIN': return 'text-green-400 border-l-4 border-green-500 pl-2';
-                    case 'ERROR': return 'text-red-400 border-l-4 border-red-500 pl-2';
-                    case 'SYSTEM': return 'text-blue-400 border-l-4 border-blue-500 pl-2';
-                    default: return 'text-slate-300 border-l-4 border-slate-600 pl-2';
-                }
-            };
-
-            const toggle = (id) => setExpandedId(expandedId === id ? null : id);
-
-            return (
-                <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-xl">
-                    <div className="p-4 bg-slate-900 border-b border-slate-700 flex items-center gap-2">
-                        <History className="text-amber-500" size={20} />
-                        <h3 className="font-bold text-slate-200 uppercase tracking-wide">Журнал Аудита</h3>
-                    </div>
-                    <div className="overflow-x-auto max-h-[600px]">
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-slate-400 uppercase bg-slate-900/50">
-                                <tr>
-                                    <th className="px-4 py-3 w-40">Время</th>
-                                    <th className="px-4 py-3 w-24">Роль</th>
-                                    <th className="px-4 py-3">Событие</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-700 font-mono">
-                                {logs.map((log) => {
-                                    const roleColor = log.role === 'ADMIN' ? 'text-red-400 font-bold' : (log.role === 'TESTER' ? 'text-blue-400 font-bold' : 'text-slate-500');
-                                    const typeClass = getTypeStyle(log.type || 'INFO');
-                                    
-                                    return (
-                                        <React.Fragment key={log.id}>
-                                            <tr className="bg-slate-800 hover:bg-slate-750 cursor-pointer transition-colors" onClick={() => toggle(log.id)}>
-                                                <td className="px-4 py-2 text-slate-500 whitespace-nowrap text-xs">
-                                                    {fmtTimeFull(log.timestamp)}
-                                                </td>
-                                                <td className={`px-4 py-2 ${roleColor}`}>{log.role}</td>
-                                                <td className="px-4 py-2">
-                                                    <div className={`flex items-center gap-2 ${typeClass}`}>
-                                                        {log.meta ? (expandedId === log.id ? <ChevronUp size={14}/> : <ChevronDown size={14}/>) : <span className="w-[14px]"></span>}
-                                                        {log.text}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {expandedId === log.id && log.meta && (
-                                                <tr className="bg-slate-900/50">
-                                                    <td colSpan="3" className="px-8 py-3">
-                                                        <div className="bg-slate-950 p-3 rounded border border-slate-800 text-xs font-mono text-green-300">
-                                                            <div className="mb-1 text-slate-500 uppercase font-bold">Metadata Payload:</div>
-                                                            <pre className="whitespace-pre-wrap">{JSON.stringify(log.meta, null, 2)}</pre>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </React.Fragment>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            );
-        };
-        const ArchiveView = ({ archives }) => {
-            const [expandedId, setExpandedId] = useState(null);
-            const toggle = (id) => setExpandedId(expandedId === id ? null : id);
-            if (archives.length === 0) return <div className="p-10 text-center text-slate-500">Архив пуст</div>;
-            return (
-                <div className="max-w-4xl mx-auto space-y-4">
-                    {archives.map(arch => (
-                        <div key={arch.id} className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-                            <div onClick={() => toggle(arch.id)} className="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-700 transition"><div className="flex items-center gap-4"><Archive className="text-amber-500" size={20} /><div><div className="font-bold text-white">{arch.date}</div><div className="text-xs text-slate-400">Победителей: {arch.results?.length || 0}</div></div></div>{expandedId === arch.id ? <ChevronUp /> : <ChevronDown />}</div>
-                            {expandedId === arch.id && (<div className="bg-slate-900 p-4 border-t border-slate-700"><div className="grid grid-cols-1 md:grid-cols-2 gap-2">{arch.results?.map((res, idx) => (<div key={idx} className="flex justify-between items-center p-2 bg-slate-800 rounded border border-slate-700"><div className="flex items-center gap-2"><span className="bg-amber-500/10 text-amber-500 text-[10px] px-1 rounded border border-amber-500/20">{res.tier}G</span><span className="text-sm font-bold text-slate-200">{res.name}</span></div><span className="text-xs font-mono text-amber-400">{res.prize} 💎</span></div>))}</div></div>)}
-                        </div>
-                    ))}
-                </div>
-            );
-        };
-        const ExcelTable = ({ members, role, fullData, logAction }) => {
-            const isEditable = role === 'ADMIN' || role === 'TESTER';
-            const sortedMembers = [...members].sort((a, b) => { const getVal = (m) => m.final !== null ? m.final : (m.intermediate !== null ? m.intermediate : m.base); return getVal(b) - getVal(a); });
-            const updateField = async (id, field, value) => { if (!isEditable) return; const num = value === '' ? null : Number(value.replace(/\s/g, '')); if (isNaN(num)) return; const currentMember = fullData.find(m => m.id === id); await setDoc(doc(db, "users", id), { ...currentMember, [field]: num }, { merge: true }); await logAction(`Изменил ${currentMember.name}: ${field === 'final' ? 'Итог' : 'Промеж.'} -> ${fmt(num)}`, 'INFO'); };
-            const forceUpload = async () => { if (!isEditable || !confirm("ВНИМАНИЕ: Это перезапишет базу данных. Продолжить?")) return; for (const u of DEMO_DATA) { await setDoc(doc(db, "users", u.id), u); } await logAction("Восстановил Демо-данные", 'SYSTEM'); };
-            const addMember = async () => { if (!isEditable) return; const name = prompt("Никнейм:"); if (!name) return; const base = Number(prompt("Базовое вложение:", "0")); if (isNaN(base)) return; const newId = String(Date.now()); await setDoc(doc(db, "users", newId), { id: newId, name, base, intermediate: null, final: null }); await logAction(`Добавил участника: ${name}`, 'SYSTEM'); };
-            const removeMember = async (m) => { if (!isEditable || !confirm(`Удалить ${m.name}?`)) return; await deleteDoc(doc(db, "users", m.id)); await logAction(`Удалил участника: ${m.name}`, 'SYSTEM'); };
-            return (
-                <div className="bg-slate-900 rounded-lg shadow-xl overflow-hidden border border-slate-700">
-                    <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center"><h2 className="font-bold text-lg text-slate-300 uppercase tracking-wider">Таблица Вкладов</h2><div className="flex gap-2">{isEditable && <button onClick={addMember} className="bg-green-900/30 text-green-400 px-3 py-1 rounded text-xs font-bold border border-green-800 hover:bg-green-900/50">Добавить</button>}{isEditable && <button onClick={forceUpload} className="bg-slate-700 text-slate-400 px-3 py-1 rounded text-xs hover:bg-slate-600">Демо</button>}</div></div>
-                    <div className="overflow-x-auto"><table className="dark-theme-table"><thead><tr><th className="w-10 text-center">#</th><th>Никнейм</th><th className="text-right">База (15.11)</th><th className="text-right header-highlight">Итоговый (01.01)</th><th className="text-right">Разница</th><th>Тиры</th>{isEditable && <th style={{width: '40px'}}></th>}</tr></thead><tbody>{sortedMembers.map((m, idx) => { const diff = getDiff(m); const diffG = getTierG(diff); return (<tr key={m.id}><td className="text-center text-slate-500">{idx+1}</td><td className="font-bold text-white">{m.name}</td><td className="col-number text-slate-400">{fmt(m.base)}</td><td className="p-0"><input className="dark-input" disabled={!isEditable} defaultValue={m.final ? fmt(m.final) : ''} onBlur={(e) => updateField(m.id, 'final', e.target.value)} placeholder="-" /></td><td className="col-number col-diff">{diff > 0 ? `+${fmt(diff)}` : '0'}</td><td><div className="cell-tiers">{TIERS.filter(t => diffG >= t).map(t => (<span key={t} className="tier-badge">{t}G</span>))}</div></td>{isEditable && (<td className="text-center cursor-pointer text-red-400 hover:text-red-300 transition" onClick={() => removeMember(m)}><Trash2 size={16} /></td>)}</tr>); })}</tbody></table></div>
-                </div>
-            );
-        };
-
-        // --- COMPONENT: VERTICAL SLOT ROULETTE ---
-        const VerticalRoulette = ({ members, role, logAction, addToast, archives, updateArchive, onSessionReset, playSound, speak, isMuted }) => {
-            const isControl = role === 'ADMIN' || role === 'TESTER';
-            const [currentTierIdx, setCurrentTierIdx] = useState(() => Number(localStorage.getItem('guild_session_tier')) || 0);
-            const [currentWinCount, setCurrentWinCount] = useState(() => Number(localStorage.getItem('guild_session_count')) || 0);
-            const gameStateRef = useRef({ tierIdx: Number(localStorage.getItem('guild_session_tier')) || 0, winCount: Number(localStorage.getItem('guild_session_count')) || 0 });
-            useEffect(() => { localStorage.setItem('guild_session_tier', currentTierIdx); gameStateRef.current.tierIdx = currentTierIdx; }, [currentTierIdx]);
-            useEffect(() => { localStorage.setItem('guild_session_count', currentWinCount); gameStateRef.current.winCount = currentWinCount; }, [currentWinCount]);
-            
-            // For UI display, we look at the active session passed from props
-            const activeSession = archives.find(s => s.status === 'active');
-            const sessionResults = activeSession ? activeSession.results : [];
-            // sessionWinners is just an array of results to check specific tier wins
-            
-            const [isSpinning, setIsSpinning] = useState(false);
-            const [tape, setTape] = useState([]);
-            const [winner, setWinner] = useState(null);
-            const [showModal, setShowModal] = useState(false);
-            const [winnerOverlayData, setWinnerOverlayData] = useState(null);
-            const [isDebugOpen, setIsDebugOpen] = useState(false);
-            
-            // Expanded History Toggle for Bottom List
-            const [expandedHistId, setExpandedHistId] = useState(null);
-
-            const listRef = useRef(null);
-            const lastSpinTimestamp = useRef(Date.now());
-            const spinAudioRef = useRef(null);
-            const currentTier = TIERS[currentTierIdx];
-            const maxWins = TIER_COUNTS[currentTier];
-            const isFinished = currentTierIdx >= TIERS.length;
-
-            // STRICT FILTERING: Qualifies for Tier AND hasn't won THIS TIER yet in this session
-            const eligible = members.filter(m => {
-                const diff = getDiff(m);
-                const tierG = getTierG(diff);
-                const qualifies = tierG >= currentTier; // 1. Investment Check
-                
-                // 2. Previous Win Check (Specific to THIS tier)
-                const alreadyWonThisTier = sessionResults.some(r => r.name === m.name && r.tier === currentTier);
-                
-                return qualifies && !alreadyWonThisTier;
+        const adminResetSession = async (opName) => {
+            const now = Date.now();
+            const isOfficial = now >= OFFICIAL_START_TIMESTAMP;
+            await db.collection("lotterySessions").doc(SESSION_DOC_ID).set({
+                sessionId: Math.random().toString(36).substring(2, 10).toUpperCase(),
+                status: 'idle', currentTier: 15, allowed: [], rejected: [],
+                stages: JSON.parse(JSON.stringify(INITIAL_STAGES_CONFIG)),
+                lastWinner: null, updatedAt: now, operatorName: opName,
+                officialStartTimestamp: now, isOfficial, validity: isOfficial ? 'OFFICIAL' : 'TEST'
             });
-            
-            // For Display List: All who qualify for this Tier
-            const allQualifiers = members.filter(m => getTierG(getDiff(m)) >= currentTier);
-            
-            const CONTAINER_HEIGHT = 320; 
-            const CARD_HEIGHT = 100;
-            const WIN_INDEX = 40; 
+        };
 
-            // RESTORE STATE ON MOUNT
+        const adminStartCheck = async (members) => {
+            const ref = db.collection("lotterySessions").doc(SESSION_DOC_ID);
+            await db.runTransaction(async (t) => {
+                const doc = await t.get(ref);
+                if (!doc.exists) throw "No session";
+                const s = doc.data();
+                const ct = s.currentTier;
+                const allowed = [], rejected = [];
+                
+                const getDiff = m => {
+                    const cur = m.final>0 ? m.final : (m.intermediate>0 ? m.intermediate : m.base);
+                    return Math.max(0, cur - m.base);
+                };
+                
+                const prevWinners = new Set();
+                if(ct === BONUS_TIER_LEVEL) {
+                    Object.values(s.stages).forEach(st => {
+                        if(st.tier !== BONUS_TIER_LEVEL) st.winners.forEach(w => prevWinners.add(w));
+                    });
+                }
+                const target = (ct === BONUS_TIER_LEVEL ? 15 : ct) * 1000000000;
+
+                members.forEach(m => {
+                    const diff = getDiff(m);
+                    const p = { id: m.id, name: m.name, diff };
+                    if(!m.name.includes("#")) rejected.push({...p, reason: "Нет ID"});
+                    else if(diff < target) rejected.push({...p, reason: `< ${ct===BONUS_TIER_LEVEL?'15':ct}G`});
+                    else if(ct === BONUS_TIER_LEVEL && prevWinners.has(m.name)) rejected.push({...p, reason: "Уже выиграл"});
+                    else allowed.push(p);
+                });
+                allowed.sort((a,b) => b.diff - a.diff);
+                t.update(ref, { status: 'checking', allowed, rejected });
+            });
+        };
+
+        const adminSetReady = async () => db.collection("lotterySessions").doc(SESSION_DOC_ID).update({status: 'ready'});
+        
+        const adminStartRoll = async () => {
+            const ref = db.collection("lotterySessions").doc(SESSION_DOC_ID);
+            await ref.update({status: 'rolling', lastWinner: null});
+            await db.runTransaction(async t => {
+                const snap = await t.get(ref);
+                const s = snap.data();
+                const key = s.currentTier.toString();
+                const st = s.stages[key];
+                st.status = 'rolling';
+                t.update(ref, { [`stages.${key}`]: st });
+            });
+        };
+
+        const adminPickWinner = async () => {
+            const ref = db.collection("lotterySessions").doc(SESSION_DOC_ID);
+            await db.runTransaction(async t => {
+                const snap = await t.get(ref);
+                const s = snap.data();
+                if(s.allowed.length === 0) throw "Empty";
+                const idx = Math.floor(Math.random() * s.allowed.length);
+                const winner = s.allowed[idx];
+                const newAllowed = [...s.allowed]; newAllowed.splice(idx, 1);
+                const newRejected = [...s.rejected, {...winner, reason: "WINNER"}];
+                const key = s.currentTier.toString();
+                const st = s.stages[key];
+                const newWinners = [...st.winners, winner.name];
+                t.update(ref, {
+                    status: 'revealed', lastWinner: winner, allowed: newAllowed, rejected: newRejected,
+                    [`stages.${key}.winners`]: newWinners
+                });
+            });
+        };
+
+        const adminNextStage = async () => {
+            const ref = db.collection("lotterySessions").doc(SESSION_DOC_ID);
+            await db.runTransaction(async t => {
+                const snap = await t.get(ref);
+                const s = snap.data();
+                const idx = TIERS_CONFIG.indexOf(s.currentTier);
+                const key = s.currentTier.toString();
+                const st = s.stages[key];
+                st.status = 'done';
+                
+                if(idx < TIERS_CONFIG.length - 1) {
+                    const next = TIERS_CONFIG[idx+1];
+                    t.update(ref, { status: 'idle', currentTier: next, [`stages.${key}`]: st, lastWinner: null });
+                } else {
+                    t.update(ref, { status: 'finished', [`stages.${key}`]: st, lastWinner: null });
+                    // Archive
+                    const allW = Object.values(s.stages).flatMap(st => st.winners.map(n => ({ name: n, tier: st.tier, reward: st.reward })));
+                    st.winners.forEach(n => { if(!allW.some(x => x.name===n && x.tier===st.tier)) allW.push({name:n, tier:st.tier, reward:st.reward}); });
+                    t.set(db.collection("history").doc(), {
+                        sessionId: s.sessionId, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        title: `${s.isOfficial?'OFFICIAL':'TEST'} Lottery`, isOfficial: s.isOfficial, winners: allW, hash: Math.random().toString(36).substring(7)
+                    });
+                }
+            });
+        };
+
+        // --- GEMINI SERVICE (Fetch) ---
+        const generateContent = async (base64, apiKey) => {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Extract RPG items from image to JSON: {items:[{visual_id, category, level, price_gold, price_crystals}]}. visual_id=type_color_feature_lvlX." }, { inlineData: { mimeType: "image/png", data: base64 } }] }] })
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error.message);
+            return data.candidates[0].content.parts[0].text.replace(/```json/g,'').replace(/```/g,'');
+        };
+
+        /*******************************************************
+         * COMPONENTS
+         *******************************************************/
+
+        // 1. HELPERS
+        const MoscowClock = () => {
+            const [time, setTime] = useState(new Date());
+            useEffect(() => { const t = setInterval(()=>setTime(new Date()), 1000); return ()=>clearInterval(t); }, []);
+            const ts = time.toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            return <div className="flex gap-4 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5"><div className="flex items-center gap-2 text-cyan-400"><Clock size={14}/><span className="font-mono font-black">{ts}</span><span className="text-[9px] text-slate-500">MSK</span></div></div>;
+        };
+
+        const isBonus = (t) => t === BONUS_TIER_LEVEL;
+        const getTierLabel = (t) => isBonus(t) ? "BONUS" : `${t}G`;
+
+        // 2. LOTTERY COMPONENTS
+        const TierCard = ({ s, active }) => {
+            const { tier, status, winners, reward } = s;
+            const isB = isBonus(tier);
+            const border = isB ? 'border-purple-500' : 'border-amber-400';
+            const shadow = isB ? 'shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'shadow-[0_0_15px_rgba(251,191,36,0.3)]';
+            return (
+                <div className={`relative flex flex-col shrink-0 w-[160px] h-[100px] rounded-xl border overflow-hidden transition-all ${active ? `${border} ${shadow}` : 'border-white/5 opacity-60'} ${status==='rolling'?'animate-pulse':''}`}>
+                    <div className="px-2 py-1.5 flex justify-between bg-black/20 border-b border-white/5">
+                        <span className={`text-sm font-black italic flex items-center gap-1 ${isB?'text-purple-400':'text-emerald-400'}`}>{isB&&<Sparkles size={10}/>}{getTierLabel(tier)}</span>
+                        <span className="text-[9px] font-bold text-slate-400">{reward}💎</span>
+                    </div>
+                    <div className="flex-1 p-1.5 flex flex-col gap-1 overflow-hidden">
+                        {winners.slice(0,3).map((w,i) => <div key={i} className="bg-black/40 px-1.5 py-0.5 rounded border border-white/5 flex items-center gap-1"><User size={8} className="text-slate-500"/><span className="text-[10px] font-bold text-slate-300 truncate font-mono">{w.split('#')[0]}</span></div>)}
+                    </div>
+                </div>
+            );
+        };
+
+        const SlotMachine = ({ target, spinning, onFinish }) => {
+            useEffect(() => { if(spinning) setTimeout(() => onFinish && onFinish(), (2+(target.length-1)*0.4)*1000 + 500); }, [spinning]);
+            const SlotDigit = ({ t, idx }) => {
+                const strip = [...Array(spinning ? 20 : 0).fill([0,1,2,3,4,5,6,7,8,9]).flat(), ...[0,1,2,3,4,5,6,7,8,9].slice(0, parseInt(t)||0 + 1)];
+                return (
+                    <div className="w-20 h-28 bg-[#1a0b0b] rounded-xl border-2 border-amber-500/50 flex flex-col items-center overflow-hidden relative">
+                         <div className="w-full flex flex-col items-center transition-transform duration-[2s]" style={{ transform: `translateY(-${(strip.length-1)*100}%)`, transitionDuration: spinning ? `${2+idx*0.4}s` : '0s' }}>
+                             {strip.map((n,i)=><div key={i} className="h-28 w-full flex items-center justify-center shrink-0"><span className="text-6xl font-black text-amber-300">{n}</span></div>)}
+                         </div>
+                    </div>
+                );
+            }
+            return <div className="flex gap-2 relative z-30">{target.map((t,i)=><SlotDigit key={i} t={t} idx={i}/>)}</div>;
+        };
+
+        const ResultModal = ({ title, winners, reward, onClose, isFinal, onReset, isAdmin }) => {
+            const ref = useRef(null);
+            const copy = async () => { if(window.htmlToImage) { const b = await window.htmlToImage.toBlob(ref.current, {backgroundColor:'#0f172a'}); await navigator.clipboard.write([new ClipboardItem({'image/png':b})]); alert("Copied!"); }};
+            return (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in zoom-in duration-300">
+                    <div ref={ref} className="w-full max-w-md bg-[#0f172a] border-2 border-amber-500/50 rounded-3xl p-8 relative shadow-2xl">
+                        <h2 className="text-3xl font-black text-white uppercase text-center mb-4">{title}</h2>
+                        <div className="space-y-2 mb-8">{winners.map((w,i)=><div key={i} className="bg-amber-500/10 border-l-4 border-amber-500 p-3 rounded-r flex items-center gap-3"><Crown size={16} className="text-black bg-amber-500 rounded-full p-0.5"/><span className="font-black text-xl text-white">{w.split('#')[0]}</span></div>)}</div>
+                        <div className="flex gap-2">
+                            <button onClick={copy} className="flex-1 bg-slate-800 text-white py-3 rounded-xl font-bold uppercase text-xs flex justify-center gap-2"><Copy size={16}/> Copy</button>
+                            <button onClick={onClose} className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold uppercase text-xs">Close</button>
+                            {isFinal && isAdmin && <button onClick={onReset} className="flex-1 bg-red-700 text-white py-3 rounded-xl font-bold uppercase text-xs"><RotateCcw size={16}/></button>}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const LotterySystem = ({ isAdmin, isSound, setIsLocked, Audio }) => {
+            const [s, setS] = useState(null);
+            const [m, setM] = useState([]);
+            const [digits, setDigits] = useState(['?','?','?','?','?']);
+            const [spin, setSpin] = useState(false);
+            const [modal, setModal] = useState({ show: false, type: 'stage' }); // type: stage | final
+
             useEffect(() => {
-                 const lastWinnerJson = localStorage.getItem('guild_last_winner');
-                 if (lastWinnerJson && !isSpinning) {
-                     try {
-                         const lastWinData = JSON.parse(lastWinnerJson);
-                         const m = members.find(u => u.name === lastWinData.name) || {name: lastWinData.name, base:0, final:0, intermediate:0};
-                         const staticTape = [];
-                         for(let i=0; i<60; i++) { if(i === WIN_INDEX) staticTape.push(m); else staticTape.push(m); }
-                         setTape(staticTape); setWinner(m);
-                         // STATIC POSITIONING
-                         const targetY = (CONTAINER_HEIGHT / 2) - ((WIN_INDEX * CARD_HEIGHT) + (CARD_HEIGHT / 2));
-                         if (listRef.current) { listRef.current.style.transition = 'none'; listRef.current.style.transform = `translateY(${targetY}px)`; }
-                     } catch(e) {}
-                 } else if (!isSpinning && eligible.length > 0) {
-                     // Ensure no duplicates in static tape for better visual
-                     const shuffled = [...eligible].sort(() => 0.5 - Math.random());
-                     const staticTape = Array.from({length: 10}, (_, i) => shuffled[i % shuffled.length]); 
-                     setTape(staticTape);
-                 }
-            }, [eligible.length]);
+                const u1 = subscribeToLottery(setS);
+                const u2 = db.collection("users").onSnapshot(snap => setM(snap.docs.map(d=>({id:d.id, ...d.data()}))));
+                return () => { u1(); u2(); };
+            }, []);
 
-            const handleReset = async () => {
-                if(!confirm("Начать новую сессию? Текущая история сохранится в Архив.")) return;
-                
-                // Update Parent State via Prop
-                await onSessionReset();
-                
-                // Reset Local State
-                localStorage.removeItem('guild_session_tier');
-                localStorage.removeItem('guild_session_count');
-                localStorage.removeItem('guild_last_winner');
-                setCurrentTierIdx(0);
-                setCurrentWinCount(0);
-                gameStateRef.current = { tierIdx: 0, winCount: 0 };
-                setWinner(null);
-                setTape([]);
+            useEffect(() => {
+                if(!s) return;
+                setIsLocked(s.status==='rolling'||s.status==='checking');
+                if(s.status==='finished' && !sessionStorage.getItem('shown_'+s.sessionId)) {
+                    setModal({show:true, type:'final'});
+                    sessionStorage.setItem('shown_'+s.sessionId, 'true');
+                    setSpin(false);
+                } else if(s.status==='rolling') {
+                    setSpin(true); setDigits(['?','?','?','?','?']);
+                } else if(s.status==='revealed' && s.lastWinner) {
+                    setDigits((s.lastWinner.name.match(/#(\d+)$/)?.[1]||"00000").split(''));
+                    setSpin(true);
+                } else if(s.status!=='finished') {
+                    setSpin(false); setDigits(['?','?','?','?','?']);
+                }
+            }, [s?.status, s?.updatedAt]);
+
+            const onSpinEnd = () => {
+                if(s?.status==='revealed') { setSpin(false); Audio.speak(`Победитель ${s.lastWinner.name.split('#')[0]}`); }
             };
+
+            const reset = async () => { if(isAdmin) { await adminResetSession(s.operatorName||"Admin"); setModal({show:false,type:'stage'}); sessionStorage.removeItem('shown_'+s.sessionId); }};
             
-            const exportData = () => { const data = { localStorage: { ...localStorage }, timestamp: Date.now() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `guild-backup-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
-            const importData = (event) => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const data = JSON.parse(e.target.result); if (data.localStorage) { if (!confirm("Это перезапишет все локальные данные и перезагрузит страницу. Продолжить?")) return; Object.keys(data.localStorage).forEach(key => { localStorage.setItem(key, data.localStorage[key]); }); window.location.reload(); } } catch (err) { alert("Ошибка чтения файла"); } }; reader.readAsText(file); };
-
-            useEffect(() => { const unsub = onSnapshot(doc(db, "gamestate", "roulette"), (docSnap) => { const data = docSnap.data(); if (data) { if (data.showWinnerModal === false) { setWinnerOverlayData(null); } if (data.isSpinning) { if (data.timestamp > lastSpinTimestamp.current) { lastSpinTimestamp.current = data.timestamp; animateSpin(data.winner, data.tier); } } } }); return () => unsub(); }, [members]);
-
-            const triggerSpin = async () => {
-                const currentLogicTierIdx = gameStateRef.current.tierIdx;
-                const currentLogicTier = TIERS[currentLogicTierIdx];
-                
-                // RE-FETCH ACTIVE SESSION WINNERS FOR STRICT FILTERING
-                const sessionResultsRef = activeSession ? activeSession.results : [];
-                
-                const pool = members.filter(m => {
-                     const diff = getDiff(m);
-                     const tierG = getTierG(diff);
-                     const qualifies = tierG >= currentLogicTier;
-                     const alreadyWonThisTier = sessionResultsRef.some(r => r.name === m.name && r.tier === currentLogicTier);
-                     return qualifies && !alreadyWonThisTier;
-                });
-
-                console.log("Eligible Pool for Spin:", pool.map(p => p.name));
-
-                if(pool.length === 0) {
-                     addToast({ title: `ОШИБКА`, message: `Нет доступных участников! Все выиграли или никто не подходит.`, type: 'error' });
-                     return;
-                }
-                if(isSpinning || currentLogicTierIdx >= TIERS.length) return;
-                
-                playSound('click');
-                // PURE RANDOM LOGIC (EQUAL CHANCE)
-                const winnerIndex = Math.floor(Math.random() * pool.length);
-                const selected = pool[winnerIndex];
-                await updateDoc(doc(db, "gamestate", "roulette"), { showWinnerModal: false });
-                await setDoc(doc(db, "gamestate", "roulette"), { isSpinning: true, winner: selected, tier: currentLogicTier, timestamp: Date.now(), initiator: role, showWinnerModal: false });
-                
-                // Note: Actual log write happens in animateSpin
-            };
-            
-            const handleOverlayClose = async () => { if (isControl) { await updateDoc(doc(db, "gamestate", "roulette"), { showWinnerModal: false }); } setWinnerOverlayData(null); };
-
-            const animateSpin = (selectedWinner, tierForSpin) => {
-                setIsSpinning(true); setWinner(selectedWinner); setWinnerOverlayData(null); 
-                const spinAudio = playSound('spin'); if (spinAudio) { spinAudioRef.current = spinAudio; spinAudio.loop = true; }
-                localStorage.setItem('guild_last_winner', JSON.stringify({name: selectedWinner.name, tier: tierForSpin}));
-
-                const tapeLength = 60; 
-                
-                // Regenerate pool strictly for visual tape (logic winner already passed)
-                const sessionResultsRef = activeSession ? activeSession.results : [];
-                const pool = members.filter(m => {
-                     if (m.name === selectedWinner.name) return true; // Always include the current winner
-                     const diff = getDiff(m);
-                     const tierG = getTierG(diff);
-                     const qualifies = tierG >= tierForSpin;
-                     const alreadyWonThisTier = sessionResultsRef.some(r => r.name === m.name && r.tier === tierForSpin);
-                     return qualifies && !alreadyWonThisTier;
-                });
-                
-                // Capture Math Context for Logging
-                const poolSize = pool.length;
-                const probability = poolSize > 0 ? (100 / poolSize).toFixed(2) + '%' : '100%';
-                const winnerDiff = getDiff(selectedWinner);
-                const winnerScore = getTierG(winnerDiff) + 'G';
-
-                const safePool = pool.length > 0 ? pool : [selectedWinner];
-                const shuffledPool = [...safePool].sort(() => 0.5 - Math.random());
-                const newTape = [];
-                while(newTape.length < tapeLength) {
-                    newTape.push(...shuffledPool);
-                }
-                newTape.length = tapeLength; // Trim excess
-                newTape[WIN_INDEX] = selectedWinner; // Force winner
-                setTape(newTape);
-
-                if(listRef.current) {
-                    listRef.current.style.transition = 'none'; listRef.current.style.transform = 'translateY(0px)'; listRef.current.offsetHeight; 
-                    const jitter = Math.floor(Math.random() * 60) - 30; 
-                    const targetY = (CONTAINER_HEIGHT / 2) - ((WIN_INDEX * CARD_HEIGHT) + (CARD_HEIGHT / 2)) + jitter;
-
-                    setTimeout(() => { if(listRef.current) { listRef.current.style.transition = 'transform 8s cubic-bezier(0.1, 0, 0.1, 1)'; listRef.current.style.transform = `translateY(${targetY}px)`; } }, 50);
-                }
-
-                setTimeout(async () => {
-                    setIsSpinning(false); if (spinAudioRef.current) { spinAudioRef.current.pause(); spinAudioRef.current = null; }
-                    playSound('win'); speak(`Победитель — ${selectedWinner.name.split('#')[0]}!`);
-                    
-                    // Construct Meta Data for logs
-                    const metaData = {
-                        investment: fmt(getDiff(selectedWinner)),
-                        poolSize: poolSize,
-                        probability: probability,
-                        stageTarget: tierForSpin + 'G',
-                        winnerScore: winnerScore,
-                        winnerId: selectedWinner.id || 'N/A'
-                    };
-
-                    const result = { 
-                        tier: tierForSpin, 
-                        name: selectedWinner.name, 
-                        prize: TIER_PRIZES[tierForSpin], 
-                        time: new Date().toLocaleTimeString("ru-RU", { timeZone: "Europe/Moscow" }),
-                        meta: metaData // Save meta to session result too
-                    };
-                    
-                    if (updateArchive) {
-                         updateArchive(result);
-                    }
-                    if (logAction) {
-                         await logAction(`Победитель ${selectedWinner.name} (Тир ${tierForSpin}G)`, 'WIN', metaData);
-                    }
-
-                    setWinnerOverlayData({ name: selectedWinner.name, prize: TIER_PRIZES[tierForSpin], tier: tierForSpin });
-                    addToast({ title: `🏆 ПОБЕДА!`, message: `${selectedWinner.name} выиграл ${TIER_PRIZES[tierForSpin]} 💎`, type: 'win' });
-
-                    const currentIdx = gameStateRef.current.tierIdx; const currentCount = gameStateRef.current.winCount; const logicTier = TIERS[currentIdx]; const logicLimit = TIER_COUNTS[logicTier];
-                    if (tierForSpin === logicTier) {
-                         if (currentCount + 1 >= logicLimit) {
-                             if (currentIdx + 1 < TIERS.length) { 
-                                const nextIdx = currentIdx + 1; 
-                                gameStateRef.current = { tierIdx: nextIdx, winCount: 0 }; 
-                                setCurrentWinCount(0); 
-                                setCurrentTierIdx(nextIdx); 
-                                const nextTierVal = TIERS[nextIdx]; 
-                                setTimeout(() => { addToast({ title: `🔔 СЛЕДУЮЩИЙ ЭТАП`, message: `Начинаем розыгрыш ${nextTierVal}G!`, type: 'info' }); logAction(`Переход к этапу ${nextTierVal}G`, 'SYSTEM'); }, 2000); 
-                             } else { 
-                                gameStateRef.current.winCount = currentCount + 1; setCurrentWinCount(prev => prev + 1); setCurrentTierIdx(prev => prev + 1); setTimeout(() => setShowModal(true), 3000); logAction("Сессия завершена", 'SYSTEM');
-                             }
-                         } else { gameStateRef.current.winCount = currentCount + 1; setCurrentWinCount(prev => prev + 1); }
-                    }
-                    if (role === 'ADMIN' || role === 'TESTER') { await updateDoc(doc(db, "gamestate", "roulette"), { isSpinning: false, showWinnerModal: true }); }
-                }, 8500);
-            };
-
-            const sortedEligible = [...allQualifiers].sort((a,b) => a.name.localeCompare(b.name));
-            const winChance = eligible.length > 0 ? (100 / eligible.length).toFixed(2) : "0.00";
+            if(!s) return <div>Loading...</div>;
+            const tData = s.stages[s.currentTier.toString()];
+            const canRoll = s.status!=='finished' && (s.status==='ready' || (s.status==='revealed' && tData.winners.length < TIER_WINNERS_COUNT[s.currentTier] && !spin));
+            const canFinish = s.status!=='finished' && (tData.winners.length >= TIER_WINNERS_COUNT[s.currentTier] || tData.status==='done');
             
             return (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
-                    <WinnerOverlay winner={winnerOverlayData} onClose={handleOverlayClose} role={role} />
-                    {isDebugOpen && (
-                        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setIsDebugOpen(false)}>
-                            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><Wrench className="text-amber-500" size={20}/> Debug: Pool Verification</h3>
-                                    <button onClick={() => setIsDebugOpen(false)}><X className="text-slate-500 hover:text-white" size={20}/></button>
-                                </div>
-                                <div className="text-xs text-slate-400 mb-2">Total Candidates: <span className="text-white font-bold">{eligible.length}</span></div>
-                                <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-950 p-2 rounded border border-slate-800 font-mono text-xs text-green-400">
-                                    {eligible.length === 0 ? "No candidates" : eligible.map((m, i) => (
-                                        <div key={i} className="border-b border-slate-800/50 py-1">{i+1}. {m.name} ({getTierG(getDiff(m))}G)</div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    <div className="lg:col-span-2 flex flex-col gap-6">
-                        <div className="flex justify-between items-end bg-slate-800 p-4 rounded-xl border border-slate-700">
-                            <div><div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Текущий Этап</div><div className="text-4xl font-black text-amber-500 drop-shadow-md leading-none">{currentTier}G <span className="text-lg text-slate-500 ml-2 font-medium">(Место {Math.min(currentWinCount + 1, maxWins)}/{maxWins})</span></div></div>
-                            <div className="flex flex-col items-end gap-2"><div className="text-right"><div className="text-xs text-slate-400 uppercase mb-1">Приз Этапа</div><div className="text-2xl font-bold text-white">{TIER_PRIZES[currentTier]} 💎</div></div>{isControl && (<div className="flex gap-2"><button onClick={handleReset} className="text-[10px] flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded transition"><RefreshCw size={10} /> Сброс</button><button onClick={exportData} className="text-[10px] flex items-center gap-1 bg-blue-900/40 hover:bg-blue-800 text-blue-300 px-2 py-1 rounded transition border border-blue-800"><Download size={10} /> Бэкап</button><label className="text-[10px] flex items-center gap-1 bg-green-900/40 hover:bg-green-800 text-green-300 px-2 py-1 rounded transition border border-green-800 cursor-pointer"><Upload size={10} /> Load<input type="file" onChange={importData} className="hidden" accept=".json" /></label></div>)}</div>
-                        </div>
-
-                        <div className="relative bg-slate-900 rounded-xl border-4 border-slate-800 shadow-2xl overflow-hidden" style={{ height: `${CONTAINER_HEIGHT}px` }}>
-                            
-                            {/* CENTER FRAME */}
-                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] h-[110px] border-y-4 border-amber-500 z-20 shadow-[0_0_20px_rgba(245,158,11,0.2)] bg-amber-500/5 pointer-events-none flex justify-between items-center px-2">
-                                <div className="text-amber-500 animate-pulse">▶</div>
-                                <div className="text-amber-500 animate-pulse">◀</div>
-                            </div>
-                            
-                            {/* ROULETTE MASK / FOG EFFECT */}
-                            <div ref={listRef} className={`flex flex-col items-center roulette-mask ${isSpinning ? 'spin-blur' : ''}`} style={{ willChange: 'transform' }}>
-                                {tape.length === 0 && <div className="h-full flex items-center justify-center text-slate-600 mt-20">Нет участников</div>}
-                                {tape.map((m, i) => (<div key={i} className="w-full flex items-center justify-between px-10 border-b border-slate-800/50 bg-slate-900" style={{ height: `${CARD_HEIGHT}px` }}><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-lg font-bold text-slate-500">{m.name[0]}</div><div className="text-left"><div className={`text-xl font-bold ${i === WIN_INDEX && !isSpinning ? 'winner-name' : 'text-slate-300'}`}>{m.name.split('#')[0]}</div></div></div><div className="text-right"><div className="text-amber-600 font-mono font-bold text-lg">{getTierG(getDiff(m))}G</div></div></div>))}
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col items-center justify-center gap-4">
-                            {winner && !isSpinning && (<div className="text-center animate-bounce"><div className="text-amber-500 uppercase text-xs font-bold tracking-widest">Победитель</div><div className="text-4xl font-black text-white">{winner.name}</div></div>)}
-                            <div className="flex gap-2 w-full">
-                                {isControl && (
-                                    <button onClick={() => setIsDebugOpen(true)} className="w-16 py-5 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition relative" title="Debug: Check Tape">
-                                        <Wrench size={20} />
-                                        <span className="ml-2 text-xs font-bold bg-slate-950 px-2 py-1 rounded text-amber-500 border border-slate-700">{eligible.length}</span>
-                                    </button>
-                                )}
-                                {isControl ? (
-                                    <button onClick={triggerSpin} disabled={isSpinning || isFinished || eligible.length === 0} className="flex-1 py-5 cta-button rounded-xl text-slate-900 shadow-[0_0_30px_rgba(245,158,11,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition transform active:scale-95">
-                                        {isSpinning ? 'ВРАЩЕНИЕ...' : isFinished ? 'СЕССИЯ ЗАВЕРШЕНА' : eligible.length === 0 ? 'НЕТ УЧАСТНИКОВ' : 'ЗАПУСТИТЬ РАУНД'}
-                                    </button>
-                                ) : (
-                                    <div className="flex-1 text-slate-500 italic p-4 border border-slate-700 rounded-lg text-center">
-                                        {isSpinning ? "Идет розыгрыш..." : "Ожидайте запуска администратором..."}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                            <h3 className="text-slate-400 text-xs font-bold uppercase mb-3">История текущей сессии</h3>
-                            <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-                                {sessionResults.slice().reverse().map((r, i) => (
-                                    <React.Fragment key={i}>
-                                        <div onClick={() => setExpandedHistId(expandedHistId === i ? null : i)} className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-slate-700/50 cursor-pointer hover:bg-slate-900 transition">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex items-center gap-1">
-                                                    {r.meta && (expandedHistId === i ? <ChevronUp size={12} className="text-slate-500"/> : <ChevronDown size={12} className="text-slate-500"/>)}
-                                                    <span className="text-slate-500 font-mono text-xs">{r.time}</span>
-                                                </div>
-                                                <span className="bg-amber-500/20 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-bold">{r.tier}G</span>
-                                                <span className="text-white font-bold text-sm">{r.name}</span>
-                                            </div>
-                                            <div className="text-amber-400 font-mono text-xs">{r.prize} 💎</div>
-                                        </div>
-                                        {expandedHistId === i && r.meta && (
-                                            <div className="bg-slate-950/50 p-2 text-[10px] font-mono text-slate-400 border-l-2 border-slate-700 ml-4 mb-2">
-                                                <div>Pool Size: {r.meta.poolSize}</div>
-                                                <div>Probability: {r.meta.probability}</div>
-                                                <div>Winner Score: {r.meta.winnerScore}</div>
-                                            </div>
-                                        )}
-                                    </React.Fragment>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="lg:col-span-1 bg-slate-800 rounded-xl border border-slate-700 flex flex-col overflow-hidden h-[700px]">
-                        <div className="p-4 bg-slate-900 border-b border-slate-700 flex justify-between items-center"><h3 className="text-slate-300 font-bold text-sm uppercase">Участники</h3><span className="text-amber-500 text-xs font-bold">{allQualifiers.length} чел.</span></div>
-                        
-                        {/* COMPACT 2-COLUMN GRID LAYOUT */}
-                        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                            <div className="grid grid-cols-2 gap-2 content-start">
-                                {sortedEligible.map((m, i) => {
-                                    const isWinner = sessionResults.some(r => r.name === m.name && r.tier === currentTier);
-                                    return (
-                                    <div key={m.id} className={`bg-slate-900/40 p-1.5 rounded border border-slate-700/50 hover:border-amber-500/30 transition flex flex-col justify-between ${isWinner ? 'opacity-50 border-red-900/50' : ''}`}>
-                                        <div className={`font-bold text-[11px] text-slate-300 truncate ${isWinner ? 'line-through text-slate-500' : ''}`}>{m.name.split('#')[0]}</div>
-                                        <div className="flex justify-between items-end mt-1">
-                                            <div className="text-slate-600 text-[9px] uppercase">ШАНС</div>
-                                            <div className="text-amber-500 font-bold text-xs">{isWinner ? '-' : winChance + '%'}</div>
-                                        </div>
-                                    </div>
-                                )})}
-                            </div>
-                        </div>
-                    </div>
+                <div className="h-full w-full grid grid-cols-[300px_1fr_300px] gap-4 p-4 relative">
+                    {modal.show && <ResultModal 
+                        title={modal.type==='final' ? "ИТОГИ РОЗЫГРЫША" : "ИТОГИ ЭТАПА"} 
+                        winners={modal.type==='final' ? Object.values(s.stages).flatMap(x=>x.winners) : tData.winners} 
+                        reward={modal.type==='stage' ? tData.reward : 0} 
+                        isFinal={modal.type==='final'}
+                        isAdmin={isAdmin}
+                        onClose={()=>setModal({...modal, show:false})} 
+                        onReset={reset} 
+                    />}
                     
-                    {showModal && (
-                        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-                            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full shadow-2xl relative">
-                                <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X size={20} /></button>
-                                <div className="text-center mb-6">
-                                    <Trophy size={48} className="mx-auto text-amber-500 mb-2" />
-                                    <h2 className="text-2xl font-black text-white uppercase">Итоги Сессии</h2>
-                                </div>
-                                <div className="bg-slate-950 rounded border border-slate-800 p-4 max-h-60 overflow-y-auto mb-6 custom-scrollbar">
-                                    {sessionResults.map((r, i) => (
-                                        <div key={i} className="flex justify-between text-sm py-1 border-b border-slate-800 last:border-0">
-                                            <span><span className="text-amber-500">{r.tier}G</span> {r.name}</span>
-                                            <span className="text-slate-400">{r.prize}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-1">
-                                    <button onClick={handleReset} className="bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
-                                        <Save size={16} /> Сохранить и Сбросить
-                                    </button>
-                                </div>
+                    {/* Left Panel */}
+                    <div className="flex flex-col rounded-2xl border border-white/10 bg-[#0a0505]/80 backdrop-blur-md overflow-hidden">
+                        <div className="h-10 px-4 flex items-center justify-between bg-emerald-950/30 border-b border-white/5"><span className="text-[10px] font-black uppercase text-emerald-400">ДОПУЩЕНО: {s.allowed.length}</span></div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">{s.allowed.map((u,i)=><div key={i} className="flex gap-3 bg-[#112520]/40 px-3 py-2 rounded text-sm text-slate-200"><span className="text-green-500 font-bold">{i+1}</span>{u.name.split('#')[0]}</div>)}</div>
+                    </div>
+
+                    {/* Center Arena */}
+                    <div className="flex flex-col gap-4">
+                        <div className="flex-1 relative rounded-3xl border border-amber-500/20 bg-gradient-to-b from-[#1a0f0f] to-[#0a0505] flex flex-col overflow-hidden">
+                            <div className="p-6 flex justify-between">
+                                <div><h2 className="text-3xl font-black text-white italic">RNG ARENA</h2><span className="text-[10px] bg-slate-800 px-2 rounded text-slate-500">{s.status}</span></div>
+                                <div className="text-right"><MoscowClock/><div className="text-4xl font-black text-amber-500 mt-2">{getTierLabel(s.currentTier)}</div></div>
                             </div>
+                            <div className="flex-1 flex flex-col items-center justify-center relative z-30 pb-10">
+                                {s.status==='idle'||s.status==='checking' ? <div className="text-center"><Gift size={48} className="text-amber-500 mx-auto mb-4"/><h3 className="text-xl font-black text-slate-300">ОЖИДАНИЕ</h3></div> : <div className="flex flex-col items-center gap-8"><SlotMachine target={digits} spinning={spin} onFinish={onSpinEnd} />{s.lastWinner && !spin && <div className="text-4xl font-black text-amber-200 animate-bounce">{s.lastWinner.name.split('#')[0]}</div>}</div>}
+                            </div>
+                            {isAdmin && <div className="absolute bottom-0 inset-x-0 p-4 bg-black/40 flex justify-center gap-4 z-50">
+                                {s.status==='idle' && <button onClick={()=>adminStartCheck(m)} className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl text-xs uppercase">Check</button>}
+                                {s.status==='checking' && <button onClick={()=>adminSetReady()} className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl text-xs uppercase">Ready</button>}
+                                {canRoll && <button onClick={async ()=>{await adminStartRoll(); setTimeout(adminPickWinner, 4000)}} className="px-12 py-3 bg-amber-600 text-white font-bold rounded-xl text-xs uppercase flex items-center gap-2"><Play size={16}/> Roll</button>}
+                                {canFinish && <><button onClick={()=>setModal({show:true,type:'stage'})} className="px-8 py-3 bg-slate-700 text-white font-bold rounded-xl text-xs uppercase flex items-center gap-2"><List size={16}/> Results</button><button onClick={()=>adminNextStage()} className="px-8 py-3 bg-emerald-600 text-white font-bold rounded-xl text-xs uppercase flex items-center gap-2">Next <ChevronRight size={16}/></button></>}
+                                {s.status==='finished' && <button onClick={()=>setModal({show:true,type:'final'})} className="px-8 py-3 bg-slate-700 text-white font-bold rounded-xl text-xs uppercase flex gap-2"><List size={16}/> Final</button>}
+                                {s.status!=='idle' && <button onClick={()=>{if(confirm("Reset?")) reset()}} className="px-4 py-3 bg-red-900/50 text-red-200 rounded-xl"><RotateCcw size={16}/></button>}
+                            </div>}
                         </div>
-                    )}
+                        <div className="h-[120px] bg-[#0a0505]/50 rounded-xl border border-white/5 p-2 flex items-center gap-3 overflow-x-auto custom-scrollbar px-1">{Object.values(s.stages).sort((a,b)=>a.tier-b.tier).map(st=><TierCard key={st.tier} s={st} active={st.tier===s.currentTier}/>)}</div>
+                    </div>
+
+                    {/* Right Panel */}
+                    <div className="flex flex-col rounded-2xl border border-white/10 bg-[#0a0505]/80 backdrop-blur-md overflow-hidden">
+                        <div className="h-10 px-4 flex items-center justify-between bg-red-950/30 border-b border-white/5"><span className="text-[10px] font-black uppercase text-red-400">ИСКЛЮЧЕНИЯ: {s.rejected.length}</span></div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">{s.rejected.map((u,i)=><div key={i} className="flex flex-col border border-white/5 px-3 py-2 rounded-lg bg-[#1a0505]/60"><div className="flex justify-between"><span className="text-sm font-bold text-slate-300">{u.name.split('#')[0]}</span>{u.reason==='WINNER' && <Trophy size={12} className="text-amber-500"/>}</div><span className="text-[9px] text-red-500/70 font-bold uppercase">{u.reason}</span></div>)}</div>
+                    </div>
                 </div>
             );
         };
+
+        // 3. GUILD MANAGER
+        const GuildManager = ({ isAdmin }) => {
+            const [m, setM] = useState([]);
+            const [q, setQ] = useState("");
+            const [add, setAdd] = useState({ name: "", base: "", intermediate: "", final: "" });
+            const [showAdd, setShowAdd] = useState(false);
+            
+            useEffect(() => db.collection("users").onSnapshot(s => setM(s.docs.map(d=>({id:d.id, ...d.data()})))), []);
+
+            const calcDiff = u => { const cur = u.final>0?u.final:(u.intermediate>0?u.intermediate:u.base); return Math.max(0, cur - u.base); };
+            const sorted = m.filter(u=>u.name.toLowerCase().includes(q.toLowerCase())).sort((a,b)=>calcDiff(b)-calcDiff(a));
+            
+            const handleAdd = async () => { if(add.name){ await db.collection("users").add({name:add.name, base:Number(add.base)||0, intermediate:Number(add.intermediate)||0, final:Number(add.final)||0}); setAdd({name:"",base:"",intermediate:"",final:""}); setShowAdd(false); }};
+            const update = async (id, d) => await db.collection("users").doc(id).update(d);
+            const del = async (id) => { if(confirm("Del?")) await db.collection("users").doc(id).delete(); };
+
+            return (
+                <div className="h-full flex flex-col p-2 gap-2 bg-[#0B1026] relative">
+                    <div className="flex gap-2 z-10">
+                         {isAdmin && <button onClick={()=>setShowAdd(!showAdd)} className="bg-emerald-600 px-4 py-2 rounded text-white text-xs font-bold uppercase"><Plus size={14}/></button>}
+                         <div className="relative flex-1"><Search className="absolute left-3 top-2 text-slate-500" size={14}/><input value={q} onChange={e=>setQ(e.target.value)} className="w-full bg-[#131b36]/60 border border-white/10 rounded pl-9 py-1.5 text-xs text-white"/></div>
+                    </div>
+                    {showAdd && isAdmin && <div className="bg-[#0f172a] border border-emerald-500/30 p-4 rounded z-20 flex flex-col gap-2">
+                        <input value={add.name} onChange={e=>setAdd({...add, name:e.target.value})} placeholder="Name" className="bg-black/40 border border-white/10 p-2 text-white text-xs"/>
+                        <div className="flex gap-2"><input type="number" value={add.base} onChange={e=>setAdd({...add, base:e.target.value})} placeholder="Base" className="bg-black/40 border border-white/10 p-2 text-white text-xs flex-1"/><input type="number" value={add.intermediate} onChange={e=>setAdd({...add, intermediate:e.target.value})} placeholder="Inter" className="bg-black/40 border border-white/10 p-2 text-white text-xs flex-1"/><input type="number" value={add.final} onChange={e=>setAdd({...add, final:e.target.value})} placeholder="Final" className="bg-black/40 border border-white/10 p-2 text-white text-xs flex-1"/></div>
+                        <button onClick={handleAdd} className="bg-emerald-600 text-white py-2 text-xs font-bold uppercase">Save</button>
+                    </div>}
+                    <div className="flex-1 bg-[#0f172a]/80 border border-white/5 rounded-xl overflow-hidden flex flex-col z-10">
+                        <div className="grid grid-cols-[40px_1fr_1fr_1fr_1fr_1fr_30px] gap-2 px-4 py-2 bg-[#131b36] text-[10px] font-bold uppercase text-slate-500"><div>#</div><div>Nick</div><div className="text-right">Base</div><div className="text-right">Inter</div><div className="text-right">Final</div><div className="text-right text-emerald-500">Diff</div><div></div></div>
+                        <div className="overflow-y-auto custom-scrollbar flex-1">{sorted.map((u,i)=>(
+                            <div key={u.id} className="grid grid-cols-[40px_1fr_1fr_1fr_1fr_1fr_30px] gap-2 px-4 py-1 items-center hover:bg-white/5 border-b border-white/5 text-sm">
+                                <div className="font-mono text-slate-500">{i+1}</div>
+                                <input value={u.name} onChange={e=>isAdmin&&update(u.id,{name:e.target.value})} disabled={!isAdmin} className="bg-transparent text-slate-200 font-bold w-full"/>
+                                <input type="number" value={u.base} onChange={e=>isAdmin&&update(u.id,{base:Number(e.target.value)})} disabled={!isAdmin} className="bg-transparent text-right text-slate-500 w-full"/>
+                                <input type="number" value={u.intermediate} onChange={e=>isAdmin&&update(u.id,{intermediate:Number(e.target.value)})} disabled={!isAdmin} className="bg-transparent text-right text-slate-400 w-full"/>
+                                <input type="number" value={u.final} onChange={e=>isAdmin&&update(u.id,{final:Number(e.target.value)})} disabled={!isAdmin} className="bg-transparent text-right text-slate-300 font-bold w-full"/>
+                                <div className="text-right font-mono text-emerald-400">{calcDiff(u).toLocaleString()}</div>
+                                <div className="text-right">{isAdmin&&<button onClick={()=>del(u.id)} className="text-red-500"><Trash2 size={12}/></button>}</div>
+                            </div>
+                        ))}</div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 4. ARCHIVE
+        const ArchiveManager = () => {
+            const [h, setH] = useState([]);
+            useEffect(() => db.collection("history").orderBy("timestamp", "desc").onSnapshot(s => setH(s.docs.map(d=>({id:d.id, ...d.data()})))), []);
+            const del = async (id) => { if(confirm("Del?")) await db.collection("history").doc(id).delete(); };
+            return (
+                <div className="h-full p-4 overflow-y-auto custom-scrollbar">
+                    <h2 className="text-2xl font-black text-slate-200 mb-4 flex items-center gap-2"><Archive/> АРХИВ</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {h.map(item => (
+                            <div key={item.id} className="bg-[#0f172a]/60 border border-white/10 rounded-xl p-4">
+                                <div className="flex justify-between mb-2"><span className="text-xs text-slate-500 font-bold">{item.timestamp ? new Date(item.timestamp.seconds*1000).toLocaleDateString() : 'N/A'}</span><button onClick={()=>del(item.id)}><Trash2 size={14}/></button></div>
+                                <h3 className="text-lg font-bold text-slate-200">{item.title}</h3>
+                                <div className="mt-2 space-y-1">{item.winners?.map((w,i)=><div key={i} className="bg-white/5 px-2 py-1 rounded text-sm flex justify-between"><span>{w.name}</span><span className="text-amber-500">{w.reward}💎</span></div>)}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // 5. APP ROOT
         const App = () => {
-            const [role, setRole] = useState('GUEST'); 
-            const [activeTab, setActiveTab] = useState('table');
-            const [members, setMembers] = useState(DEMO_DATA); 
-            const [archives, setArchives] = useState([]); 
-            const [logs, setLogs] = useState([]);
-            const [isLoginOpen, setIsLoginOpen] = useState(false);
-            const [toasts, setToasts] = useState([]);
-            const [isMuted, setIsMuted] = useState(false);
-            const playSound = (type) => { if (isMuted) return null; const audio = new Audio(AUDIO_URLS[type]); audio.volume = 0.5; audio.play().catch(e => console.log("Audio play failed", e)); return audio; };
-            const speak = (text) => { if (isMuted) return; if ('speechSynthesis' in window) { const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'ru-RU'; utterance.rate = 1.0; window.speechSynthesis.speak(utterance); } };
-            useEffect(() => { const loadArchives = () => { let data = JSON.parse(localStorage.getItem('guild_archives') || '[]'); data = data.filter(s => s.results && s.results.length > 0 || s.date === new Date().toLocaleDateString("ru-RU")); const today = new Date().toLocaleDateString("ru-RU"); let active = data.find(s => s.date === today && s.status === 'active'); if (!active) { active = { id: Date.now(), date: today, results: [], status: 'active' }; data.push(active); } setArchives(data); localStorage.setItem('guild_archives', JSON.stringify(data)); }; loadArchives(); }, []);
-            
-            // RESET SESSION LOGIC (Moved to App)
-            const handleSessionReset = async () => {
-                await logAction("Сбросил сессию (новая игра)", 'SYSTEM');
-                const now = new Date();
-                const timeLabel = `[${now.toLocaleTimeString("ru-RU", {hour:'2-digit', minute:'2-digit'})}]`;
-                
-                // Complete old session
-                const newArchives = archives.map(s => s.status === 'active' ? {...s, status: 'completed', date: s.date + ' ' + timeLabel} : s);
-                // Create new session
-                newArchives.push({ id: Date.now(), date: now.toLocaleDateString("ru-RU"), results: [], status: 'active' });
-                
-                setArchives(newArchives);
-                localStorage.setItem('guild_archives', JSON.stringify(newArchives));
-            };
+            const [tab, setTab] = useState('stats');
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [showLogin, setShowLogin] = useState(false);
+            const [pass, setPass] = useState("");
 
-            const updateArchive = (result) => { const newArchives = [...archives]; const activeIdx = newArchives.findIndex(s => s.status === 'active'); if (activeIdx > -1) { newArchives[activeIdx].results.push(result); setArchives(newArchives); localStorage.setItem('guild_archives', JSON.stringify(newArchives)); } };
-            const addToast = (toast) => { const id = Date.now(); setToasts(prev => [...prev, { ...toast, id }]); setTimeout(() => { setToasts(prev => prev.filter(t => t.id !== id)); }, 5000); };
-            const removeToast = (id) => { setToasts(prev => prev.filter(t => t.id !== id)); };
-            useEffect(() => { const q = query(collection(db, "users")); const unsub = onSnapshot(q, (snapshot) => { if(!snapshot.empty) { const data = snapshot.docs.map(d => ({id: d.id, ...d.data()})); data.sort((a,b) => Number(a.id) - Number(b.id)); setMembers(data); } }); return () => unsub(); }, []);
-            useEffect(() => { if(role === 'ADMIN' || role === 'TESTER') { const q = query(collection(db, "logs"), orderBy("timestamp", "desc"), limit(50)); const unsub = onSnapshot(q, (snapshot) => { const data = snapshot.docs.map(d => ({id: d.id, ...d.data()})); setLogs(data); }); return () => unsub(); } }, [role]);
-            const toggleAuth = () => { if(role !== 'GUEST') { setRole('GUEST'); setActiveTab('table'); } else { setIsLoginOpen(true); } };
-            const handleLogin = (newRole) => { setRole(newRole); setIsLoginOpen(false); };
-            const logAction = async (text, type = 'INFO', meta = null) => { await addDoc(collection(db, "logs"), { text, role, timestamp: Date.now(), type, meta }); };
+            const login = (e) => { e.preventDefault(); if(pass===ACCESS_CODE){ setIsAdmin(true); setShowLogin(false); } else alert("Wrong"); };
+
             return (
-                <div className="min-h-screen pb-10 relative">
-                     <Snowfall style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh' }} snowflakeCount={100} color="rgba(255, 255, 255, 0.3)" />
-                    <div className="relative z-10">
-                        <MoscowClock />
-                        <ToastContainer toasts={toasts} removeToast={removeToast} />
-                        <div className="fixed top-4 right-4 z-50 flex gap-2"><button onClick={() => setIsMuted(!isMuted)} className="text-slate-500 hover:text-amber-500 transition bg-slate-900/50 p-2 rounded-full pointer-events-auto">{isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}</button><button onClick={toggleAuth} className="text-slate-500 hover:text-amber-500 transition bg-slate-900/50 p-2 rounded-full pointer-events-auto flex items-center gap-2"><span className="text-[10px] font-bold uppercase">{role}</span>{role !== 'GUEST' ? <Unlock size={20} /> : <Lock size={20} />}</button></div>
-                        <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLogin={handleLogin} />
-                        <div className="max-w-[1400px] mx-auto pt-24 px-4"><CountdownTimer /><div className="flex justify-center mb-8"><div className="bg-slate-800 p-1 rounded-full border border-slate-700 flex">
-                        
-                        <button onClick={() => setActiveTab('table')} className={`px-6 py-2 rounded-full text-sm font-bold transition ${activeTab === 'table' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Таблица</button>
-                        
-                        <button onClick={() => setActiveTab('lottery')} className={`px-6 py-2 rounded-full text-sm font-bold transition flex items-center gap-2 ${activeTab === 'lottery' ? 'bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-slate-800 text-amber-500 border border-amber-500/50 hover:bg-amber-500/10'}`}><PartyPopper size={16} /> РОЗЫГРЫШ</button>
-                        
-                        <button onClick={() => setActiveTab('archive')} className={`px-6 py-2 rounded-full text-sm font-bold transition ${activeTab === 'archive' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}>Архив</button>
-                        
-                        {(role === 'ADMIN' || role === 'TESTER') && <button onClick={() => setActiveTab('logs')} className={`px-6 py-2 rounded-full text-sm font-bold transition flex items-center gap-1 ${activeTab === 'logs' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}><Eye size={14} /> Журнал</button>}
-                        
-                        <button onClick={() => setActiveTab('updates')} className={`px-6 py-2 rounded-full text-sm font-bold transition flex items-center gap-1 ${activeTab === 'updates' ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-white'}`}><Megaphone size={14} /> Обновления</button>
-                        
-                        </div></div>{activeTab === 'table' && <ExcelTable members={members} role={role} fullData={members} logAction={logAction} />}{activeTab === 'lottery' && <VerticalRoulette members={members} role={role} logAction={logAction} addToast={addToast} archives={archives} updateArchive={updateArchive} onSessionReset={handleSessionReset} playSound={playSound} speak={speak} isMuted={isMuted} />}{activeTab === 'archive' && <ArchiveView archives={archives} />}{activeTab === 'logs' && (role === 'ADMIN' || role === 'TESTER') && <LogsView logs={logs} />}{activeTab === 'updates' && <ChangelogView />}</div>
-                    </div>
+                <div className="min-h-screen bg-[#020617] text-slate-200 font-sans flex flex-col relative overflow-hidden">
+                    <div className="fixed inset-0 pointer-events-none z-0">{[...Array(20)].map((_,i)=><div key={i} className="snowflake" style={{left:Math.random()*100+'vw', animationDuration: 5+Math.random()*5+'s', opacity:0.3}}>❄</div>)}</div>
+                    
+                    <nav className="relative z-50 bg-[#0f172a]/90 backdrop-blur-md border-b border-white/10 px-4 py-3 flex items-center justify-between shadow-md">
+                        <div className="flex items-center gap-2"><div className="w-8 h-8 rounded bg-red-700 flex items-center justify-center font-bold text-white">G</div><span className="font-bold hidden sm:block">GUILD IONIA</span></div>
+                        <div className="flex gap-2 bg-[#0f172a] p-1 rounded-full border border-white/10">
+                            {[ {id:'stats',l:'Stats',i:Users}, {id:'lottery',l:'Loto',i:Gift}, {id:'archive',l:'Archive',i:Archive}, {id:'market',l:'Scan',i:ScanLine} ].map(t => (
+                                <button key={t.id} onClick={()=>setTab(t.id)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase flex items-center gap-2 ${tab===t.id?'bg-slate-700 text-white':'text-slate-500 hover:text-slate-300'}`}>{t.id==='market'&&!isAdmin?<Lock size={12}/>:<t.i size={14}/>} {t.l}</button>
+                            ))}
+                        </div>
+                        <button onClick={()=>isAdmin?setIsAdmin(false):setShowLogin(true)} className={`px-3 py-1 text-[10px] font-bold uppercase border rounded ${isAdmin?'text-red-300 border-red-500/30':'text-slate-400 border-slate-700'}`}>{isAdmin?"Exit":"Admin"}</button>
+                    </nav>
+
+                    <main className="flex-1 relative z-10 overflow-hidden pt-4 p-2">
+                        <div className="h-full max-w-[1920px] mx-auto">
+                            {tab==='stats' && <GuildManager isAdmin={isAdmin}/>}
+                            {tab==='lottery' && <LotterySystem isAdmin={isAdmin} isSound={true} setIsLocked={()=>{}} Audio={AudioController} />}
+                            {tab==='archive' && <ArchiveManager/>}
+                            {tab==='market' && (isAdmin ? <div className="p-4 text-center">Experimental Manager Placeholder (See logic in script)</div> : <div className="h-full flex items-center justify-center text-slate-500"><Lock size={48} className="mb-4"/><p>Admin Only</p></div>)}
+                        </div>
+                    </main>
+                    
+                    {showLogin && <div className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4">
+                        <div className="bg-[#0f172a] border border-cyan-500/30 p-6 rounded-2xl w-full max-w-sm text-center">
+                            <Lock size={32} className="text-cyan-400 mx-auto mb-4"/><h3 className="text-white font-bold uppercase mb-4">Admin Access</h3>
+                            <form onSubmit={login}><input type="password" value={pass} onChange={e=>setPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded p-3 text-center text-white mb-4" placeholder="Code"/><button className="w-full bg-cyan-600 text-white font-bold py-3 rounded uppercase text-xs">Login</button></form>
+                            <button onClick={()=>setShowLogin(false)} className="mt-4 text-xs text-slate-500">Cancel</button>
+                        </div>
+                    </div>}
                 </div>
             );
         };
-        const root = createRoot(document.getElementById('root')); root.render(<App />);
+
+        // RENDER
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
